@@ -1,0 +1,32 @@
+name: DJ Bot Tweet Scheduler
+
+on:
+  schedule:
+    # Run twice daily at 10 AM and 6 PM UTC
+    - cron: '0 10,18 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  tweet:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Send tweet
+      env:
+        TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+        TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+        ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
+      run: npm start 
