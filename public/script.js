@@ -14,6 +14,32 @@ class TwitterBotDashboard {
         this.loadTweets();
         this.startAutoRefresh();
         this.showTab('tweets');
+        this.initializeCompose();
+    }
+
+    initializeCompose() {
+        // Initialize character counter and button states
+        const composeTextarea = document.getElementById('new-tweet-content');
+        const charCountEl = document.getElementById('new-tweet-char-count');
+        const postBtn = document.getElementById('post-directly');
+        const saveBtn = document.getElementById('save-draft');
+        
+        if (charCountEl) {
+            charCountEl.textContent = '0/280 characters';
+        }
+        
+        if (postBtn) {
+            postBtn.disabled = true;
+        }
+        
+        if (saveBtn) {
+            saveBtn.disabled = true;
+        }
+        
+        // Focus on compose area for immediate use
+        if (composeTextarea) {
+            composeTextarea.focus();
+        }
     }
 
     setupEventListeners() {
@@ -28,6 +54,16 @@ class TwitterBotDashboard {
         // Tweet management buttons
         document.getElementById('generate-tweet')?.addEventListener('click', () => this.generateTweet());
         document.getElementById('clear-posted')?.addEventListener('click', () => this.clearPostedTweets());
+
+        // New compose functionality
+        document.getElementById('post-directly')?.addEventListener('click', () => this.postDirectly());
+        document.getElementById('save-draft')?.addEventListener('click', () => this.saveDraft());
+        
+        // Character counting for compose area
+        const composeTextarea = document.getElementById('new-tweet-content');
+        if (composeTextarea) {
+            composeTextarea.addEventListener('input', (e) => this.handleComposeInput(e));
+        }
 
         // Auto-refresh when tab becomes visible
         document.addEventListener('visibilitychange', () => {
@@ -343,6 +379,121 @@ class TwitterBotDashboard {
             }
         } catch (error) {
             console.error('Error generating tweet:', error);
+            this.showToast('Failed to generate tweet. Try writing one manually instead!', 'info');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    handleComposeInput(event) {
+        const content = event.target.value;
+        const charCount = content.length;
+        const charCountEl = document.getElementById('new-tweet-char-count');
+        
+        if (charCountEl) {
+            charCountEl.textContent = `${charCount}/280 characters`;
+            charCountEl.className = `character-count ${charCount > 280 ? 'error' : charCount > 260 ? 'warning' : ''}`;
+        }
+
+        // Enable/disable post button based on content
+        const postBtn = document.getElementById('post-directly');
+        const saveBtn = document.getElementById('save-draft');
+        
+        if (postBtn) {
+            postBtn.disabled = charCount === 0 || charCount > 280;
+        }
+        if (saveBtn) {
+            saveBtn.disabled = charCount === 0;
+        }
+    }
+
+    async postDirectly() {
+        const textarea = document.getElementById('new-tweet-content');
+        const content = textarea.value.trim();
+        
+        if (!content) {
+            this.showToast('Please write something to tweet!', 'warning');
+            return;
+        }
+
+        if (content.length > 280) {
+            this.showToast('Tweet is too long! Please shorten it.', 'error');
+            return;
+        }
+
+        this.showLoading(true);
+        try {
+            // Post directly to Twitter without saving to queue first
+            const response = await fetch('/api/post-direct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                // Clear the compose area
+                textarea.value = '';
+                this.handleComposeInput({ target: textarea });
+                
+                // Add to tweets list for display
+                this.tweets.unshift(result.tweet);
+                this.renderTweets();
+                this.updateStats();
+                
+                this.showToast('🎉 Tweet posted successfully to Twitter!', 'success');
+            } else {
+                const errorData = await response.json();
+                console.error('Direct post failed:', errorData);
+                if (response.status === 403) {
+                    this.showToast('Tweet may be duplicate content. Try changing it slightly.', 'warning');
+                } else {
+                    this.showToast(`Failed to post tweet: ${errorData.error}`, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error posting directly:', error);
+            this.showToast('Network error - please check your connection', 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async saveDraft() {
+        const textarea = document.getElementById('new-tweet-content');
+        const content = textarea.value.trim();
+        
+        if (!content) {
+            this.showToast('Please write something to save!', 'warning');
+            return;
+        }
+
+        this.showLoading(true);
+        try {
+            const response = await fetch('/api/save-draft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                // Clear the compose area
+                textarea.value = '';
+                this.handleComposeInput({ target: textarea });
+                
+                // Add to tweets list
+                this.tweets.unshift(result.tweet);
+                this.renderTweets();
+                this.updateStats();
+                
+                this.showToast('💾 Tweet saved as draft!', 'success');
+            } else {
+                const error = await response.json();
+                this.showToast(`Failed to save draft: ${error.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error saving draft:', error);
             this.showToast('Network error - please check your connection', 'error');
         } finally {
             this.showLoading(false);

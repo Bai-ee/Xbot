@@ -37,15 +37,35 @@
                 </div>
             </div>
 
+            <!-- Compose New Tweet -->
+            <div class="compose-section">
+                <h3>✍️ Compose New Tweet</h3>
+                <div class="compose-card">
+                    <textarea 
+                        id="new-tweet-content"
+                        class="tweet-textarea" 
+                        placeholder="What's happening? Write your tweet here..."
+                        maxlength="280"
+                    ></textarea>
+                    <div class="tweet-footer">
+                        <div class="character-count" id="new-tweet-char-count">0/280 characters</div>
+                        <div class="compose-actions">
+                            <button id="post-directly" class="btn btn-success">🚀 Post Now</button>
+                            <button id="save-draft" class="btn btn-primary">💾 Save as Draft</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="controls">
-                <button id="generate-tweet" class="btn btn-primary">🎵 Generate DJ Tweet</button>
+                <button id="generate-tweet" class="btn btn-secondary">🎵 Generate DJ Tweet (Optional)</button>
                 <button id="clear-posted" class="btn btn-secondary">🗑️ Clear Posted</button>
             </div>
 
             <div class="tweet-queue" id="tweet-queue">
                 <div class="empty-state">
                     <h3>🎶 No tweets in queue</h3>
-                    <p>Generate some fresh DJ content to get started!</p>
+                    <p>Write a tweet above or generate some DJ content!</p>
                 </div>
             </div>
         </div>

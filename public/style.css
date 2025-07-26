@@ -153,6 +153,58 @@ body {
   flex-wrap: wrap;
 }
 
+/* Compose Section */
+.compose-section {
+  margin-bottom: 30px;
+}
+
+.compose-section h3 {
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.compose-card {
+  background: white;
+  border-radius: var(--border-radius-large);
+  padding: 25px;
+  box-shadow: var(--shadow);
+  border: 2px solid var(--primary-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.compose-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.compose-card .tweet-textarea {
+  min-height: 120px;
+  font-size: 1.1rem;
+  border: none;
+  background: var(--secondary-color);
+  margin-bottom: 15px;
+}
+
+.compose-card .tweet-textarea:focus {
+  background: white;
+}
+
+.tweet-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.compose-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* Buttons */
 .btn {
   padding: 12px 24px;
