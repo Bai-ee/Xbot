@@ -146,4 +146,4 @@ The bot includes a full REST API:
 **Railway Deploy**: Ready for production deployment  
 **Tweet Approval**: Full control over your content  
 
-Happy DJing! 🎧✨
+Happy DJing! 🎧✨# Xbot
