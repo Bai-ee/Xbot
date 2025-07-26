@@ -1,0 +1,12 @@
+{
+    "cursor.general.globalIgnore": [
+        "node_modules/**",
+        ".git/**",
+        "*.log"
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/node_modules": true,
+        "**/*.log": true
+    }
+}

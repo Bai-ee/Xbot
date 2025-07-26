@@ -284,6 +284,172 @@ app.post('/api/auto-generate', (req, res) => {
   res.json({ success: true, tweet: newTweet, pendingCount: pendingCount + 1 });
 });
 
+// Get user profile data
+app.get('/api/profile', async (req, res) => {
+  try {
+    // Get current user info
+    const user = await client.v2.me({
+      'user.fields': [
+        'created_at',
+        'description',
+        'entities',
+        'id',
+        'location',
+        'name',
+        'pinned_tweet_id',
+        'profile_image_url',
+        'protected',
+        'public_metrics',
+        'url',
+        'username',
+        'verified'
+      ]
+    });
+    
+    res.json(user.data);
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch profile data', 
+      details: error.message 
+    });
+  }
+});
+
+// Get recent tweets with metrics
+app.get('/api/recent-tweets', async (req, res) => {
+  try {
+    // First get current user ID
+    const currentUser = await client.v2.me();
+    const tweets = await client.v2.userTimeline(currentUser.data.id, {
+      max_results: 10,
+      'tweet.fields': [
+        'author_id',
+        'context_annotations',
+        'created_at',
+        'entities',
+        'id',
+        'in_reply_to_user_id',
+        'lang',
+        'public_metrics',
+        'text'
+      ]
+    });
+    
+    res.json(tweets.data);
+  } catch (error) {
+    console.error('Error fetching recent tweets:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch recent tweets', 
+      details: error.message 
+    });
+  }
+});
+
+// Get followers count and following count
+app.get('/api/followers', async (req, res) => {
+  try {
+    const currentUser = await client.v2.me({
+      'user.fields': ['public_metrics']
+    });
+    
+    res.json({
+      followers_count: currentUser.data.public_metrics.followers_count,
+      following_count: currentUser.data.public_metrics.following_count,
+      tweet_count: currentUser.data.public_metrics.tweet_count,
+      listed_count: currentUser.data.public_metrics.listed_count,
+      username: currentUser.data.username,
+      name: currentUser.data.name
+    });
+  } catch (error) {
+    console.error('Error fetching followers:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch followers data', 
+      details: error.message 
+    });
+  }
+});
+
+// Get specific tweet metrics
+app.get('/api/tweet/:id/metrics', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const tweet = await client.v2.singleTweet(id, {
+      'tweet.fields': [
+        'author_id',
+        'created_at',
+        'public_metrics',
+        'text',
+        'context_annotations'
+      ]
+    });
+    
+    res.json({
+      tweet: tweet.data,
+      metrics: tweet.data.public_metrics
+    });
+  } catch (error) {
+    console.error('Error fetching tweet metrics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch tweet metrics', 
+      details: error.message 
+    });
+  }
+});
+
+// Get analytics dashboard data
+app.get('/api/analytics', async (req, res) => {
+  try {
+    // Get user profile with metrics
+    const profile = await client.v2.me({
+      'user.fields': ['public_metrics', 'created_at', 'description', 'profile_image_url']
+    });
+    
+    // Get recent tweets with metrics
+    const recentTweets = await client.v2.userTimeline(profile.data.id, {
+      max_results: 10,
+      'tweet.fields': ['created_at', 'public_metrics', 'text']
+    });
+    
+    // Calculate total engagement from recent tweets
+    let totalLikes = 0;
+    let totalRetweets = 0;
+    let totalReplies = 0;
+    let totalQuotes = 0;
+    
+    if (recentTweets.data) {
+      recentTweets.data.forEach(tweet => {
+        if (tweet.public_metrics) {
+          totalLikes += tweet.public_metrics.like_count || 0;
+          totalRetweets += tweet.public_metrics.retweet_count || 0;
+          totalReplies += tweet.public_metrics.reply_count || 0;
+          totalQuotes += tweet.public_metrics.quote_count || 0;
+        }
+      });
+    }
+    
+    res.json({
+      profile: profile.data,
+      recent_engagement: {
+        total_likes: totalLikes,
+        total_retweets: totalRetweets,
+        total_replies: totalReplies,
+        total_quotes: totalQuotes,
+        tweets_analyzed: recentTweets.data?.length || 0,
+        avg_likes_per_tweet: recentTweets.data?.length ? Math.round(totalLikes / recentTweets.data.length) : 0
+      },
+      recent_tweets: recentTweets.data || []
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch analytics', 
+      details: error.message 
+    });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
