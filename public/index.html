@@ -3,59 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎵 DJ Twitter Bot Dashboard</title>
+    <title>🎵 Creative Tech DJ Twitter Bot Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <div class="header-content">
-                <h1>🎵 Creative Tech DJ Bot Dashboard</h1>
-                <p>Monitor and approve tweets before they go live</p>
-            </div>
-            <div class="header-actions">
-                <button id="generateBtn" class="btn btn-primary">Generate New Tweet</button>
-                <button id="clearPostedBtn" class="btn btn-secondary">Clear Posted</button>
-            </div>
+            <h1>🎵 Creative Tech DJ Twitter Bot</h1>
+            <p class="subtitle">Manage and approve your tweets before they go live</p>
         </header>
 
-        <div class="stats">
-            <div class="stat-card">
-                <span class="stat-number" id="pendingCount">0</span>
-                <span class="stat-label">Pending</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="postedCount">0</span>
-                <span class="stat-label">Posted Today</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="queueCount">0</span>
-                <span class="stat-label">Total Queue</span>
-            </div>
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" data-tab="tweets">📝 Tweet Queue</button>
+            <button class="tab-button" data-tab="analytics">📊 Analytics</button>
+            <button class="tab-button" data-tab="profile">👤 Profile</button>
         </div>
 
-        <div class="tweets-section">
-            <h2>Tweet Queue</h2>
-            <div id="tweetsContainer" class="tweets-container">
-                <div class="empty-state" id="emptyState">
-                    <div class="empty-icon">📝</div>
-                    <h3>No tweets in queue</h3>
-                    <p>Generate some tweets to get started!</p>
-                    <button class="btn btn-primary" onclick="generateTweet()">Generate Tweet</button>
+        <!-- Tweet Queue Tab -->
+        <div class="tab-content active" id="tweets-tab">
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <div class="stats-number" id="pending-count">0</div>
+                    <div class="stats-label">Pending Tweets</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number" id="posted-count">0</div>
+                    <div class="stats-label">Posted Tweets</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number" id="total-count">0</div>
+                    <div class="stats-label">Total Tweets</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="generate-tweet" class="btn btn-primary">🎵 Generate DJ Tweet</button>
+                <button id="clear-posted" class="btn btn-secondary">🗑️ Clear Posted</button>
+            </div>
+
+            <div class="tweet-queue" id="tweet-queue">
+                <div class="empty-state">
+                    <h3>🎶 No tweets in queue</h3>
+                    <p>Generate some fresh DJ content to get started!</p>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="loading-overlay hidden">
-        <div class="spinner"></div>
-        <p>Processing...</p>
-    </div>
+        <!-- Analytics Tab -->
+        <div class="tab-content" id="analytics-tab">
+            <div class="analytics-grid">
+                <div class="analytics-card">
+                    <h3>📈 Account Overview</h3>
+                    <div class="analytics-stats">
+                        <div class="stat-item">
+                            <span class="stat-value" id="followers-count">-</span>
+                            <span class="stat-label">Followers</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="following-count">-</span>
+                            <span class="stat-label">Following</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="total-tweets-count">-</span>
+                            <span class="stat-label">Total Tweets</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="total-likes-count">-</span>
+                            <span class="stat-label">Total Likes</span>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Toast notifications -->
-    <div id="toastContainer" class="toast-container"></div>
+                <div class="analytics-card">
+                    <h3>🔥 Recent Engagement</h3>
+                    <div class="analytics-stats">
+                        <div class="stat-item">
+                            <span class="stat-value" id="recent-likes">-</span>
+                            <span class="stat-label">Recent Likes</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="recent-retweets">-</span>
+                            <span class="stat-label">Recent Retweets</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="recent-replies">-</span>
+                            <span class="stat-label">Recent Replies</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="avg-likes">-</span>
+                            <span class="stat-label">Avg Likes/Tweet</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-card full-width">
+                    <h3>🎵 Recent DJ Tweets</h3>
+                    <div class="recent-tweets" id="recent-tweets-list">
+                        <div class="loading">Loading recent tweets...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div class="tab-content" id="profile-tab">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <img id="profile-image" src="" alt="Profile" class="profile-avatar">
+                    <div class="profile-info">
+                        <h2 id="profile-name">-</h2>
+                        <p id="profile-username">@-</p>
+                        <p id="profile-description">-</p>
+                    </div>
+                </div>
+                <div class="profile-stats">
+                    <div class="profile-stat">
+                        <div class="profile-stat-number" id="profile-followers">-</div>
+                        <div class="profile-stat-label">Followers</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-number" id="profile-following">-</div>
+                        <div class="profile-stat-label">Following</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-number" id="profile-tweets">-</div>
+                        <div class="profile-stat-label">Tweets</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-number" id="profile-media">-</div>
+                        <div class="profile-stat-label">Media</div>
+                    </div>
+                </div>
+                <div class="profile-details">
+                    <p><strong>📅 Joined:</strong> <span id="profile-joined">-</span></p>
+                    <p><strong>📍 Location:</strong> <span id="profile-location">-</span></p>
+                    <p><strong>🔗 Website:</strong> <a id="profile-url" href="#" target="_blank">-</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
 
     <script src="script.js"></script>
 </body>

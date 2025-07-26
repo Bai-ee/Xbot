@@ -406,11 +406,17 @@ app.get('/api/analytics', async (req, res) => {
       'user.fields': ['public_metrics', 'created_at', 'description', 'profile_image_url']
     });
     
-    // Get recent tweets with metrics
-    const recentTweets = await client.v2.userTimeline(profile.data.id, {
-      max_results: 10,
-      'tweet.fields': ['created_at', 'public_metrics', 'text']
-    });
+    // Get recent tweets with metrics (handle rate limits gracefully)
+    let recentTweets = null;
+    try {
+      const tweetsResponse = await client.v2.userTimeline(profile.data.id, {
+        max_results: 10,
+        'tweet.fields': ['created_at', 'public_metrics', 'text']
+      });
+      recentTweets = tweetsResponse;
+    } catch (tweetsError) {
+      console.log('Recent tweets unavailable:', tweetsError.code === 429 ? 'Rate limited' : tweetsError.message);
+    }
     
     // Calculate total engagement from recent tweets
     let totalLikes = 0;
@@ -418,7 +424,7 @@ app.get('/api/analytics', async (req, res) => {
     let totalReplies = 0;
     let totalQuotes = 0;
     
-    if (recentTweets.data) {
+    if (recentTweets && recentTweets.data && Array.isArray(recentTweets.data)) {
       recentTweets.data.forEach(tweet => {
         if (tweet.public_metrics) {
           totalLikes += tweet.public_metrics.like_count || 0;
@@ -436,10 +442,10 @@ app.get('/api/analytics', async (req, res) => {
         total_retweets: totalRetweets,
         total_replies: totalReplies,
         total_quotes: totalQuotes,
-        tweets_analyzed: recentTweets.data?.length || 0,
-        avg_likes_per_tweet: recentTweets.data?.length ? Math.round(totalLikes / recentTweets.data.length) : 0
+        tweets_analyzed: recentTweets?.data?.length || 0,
+        avg_likes_per_tweet: recentTweets?.data?.length ? Math.round(totalLikes / recentTweets.data.length) : 0
       },
-      recent_tweets: recentTweets.data || []
+      recent_tweets: recentTweets?.data || []
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);
