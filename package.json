@@ -1,0 +1,24 @@
+{
+  "name": "creative-tech-dj-twitter-bot",
+  "version": "1.0.0",
+  "description": "X Premium+ posting bot for DJs and Creative-Tech users with web dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "bot": "node src/index.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["twitter", "bot", "dj", "creative-tech", "social-media", "automation", "dashboard"],
+  "author": "Creative Tech DJ",
+  "license": "MIT",
+  "dependencies": {
+    "twitter-api-v2": "^1.15.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "fs-extra": "^11.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
