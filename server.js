@@ -1416,9 +1416,30 @@ app.get('/api/analytics', async (req, res) => {
   }
 });
 
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime() 
+  });
+});
+
+// Debug endpoint to check environment variables (for troubleshooting)
+app.get('/debug-env', (req, res) => {
+  const envDebug = {
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    TWITTER_API_KEY_LENGTH: process.env.TWITTER_API_KEY ? process.env.TWITTER_API_KEY.length : 'not set',
+    TWITTER_API_KEY_FIRST_10: process.env.TWITTER_API_KEY ? process.env.TWITTER_API_KEY.substring(0, 10) : 'not set',
+    OPENAI_API_KEY_LENGTH: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 'not set',
+    OPENAI_API_KEY_FIRST_10: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 10) : 'not set',
+    OPENAI_API_KEY_HAS_QUOTES: process.env.OPENAI_API_KEY ? (process.env.OPENAI_API_KEY.startsWith('"') && process.env.OPENAI_API_KEY.endsWith('"')) : false,
+    OPENAI_AVAILABLE: openaiAvailable,
+    TIMESTAMP: new Date().toISOString()
+  };
+  
+  res.json(envDebug);
 });
 
 // Clear analytics cache (for debugging/manual refresh)
