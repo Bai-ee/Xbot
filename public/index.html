@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎵 Creative Tech DJ Twitter Bot Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <script src="debug-artists.js"></script>
 </head>
 <body>
     <div class="container">
@@ -19,7 +20,9 @@
             <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
             <button class="tab-btn" data-tab="chat">🤖 AI Assistant</button>
             <button class="tab-btn" data-tab="multi-agent">🚀 Multi-Agent</button>
+            <button class="tab-btn" data-tab="image">🖼️ Image Generation</button>
             <button class="tab-btn" data-tab="video">🎬 Video Generation</button>
+            <button class="tab-btn" data-tab="audio">🎵 Audio Generation</button>
         </div>
 
         <!-- Queue Tab -->
@@ -352,6 +355,14 @@
                 <div class="video-header">
                     <h3>🎬 Arweave Video Generation</h3>
                     <p>Create professional videos using Arweave audio and AI-powered visuals</p>
+                    
+                    <!-- DEBUG TEST BUTTON -->
+                    <div style="margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                        <button onclick="testArtists()" style="background: #ff6b6b; color: white; padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer;">
+                            🔍 DEBUG: Test Artist Loading
+                        </button>
+                        <small style="margin-left: 10px; color: #666;">Check browser console (F12) for detailed logs</small>
+                    </div>
                 </div>
 
                 <!-- Quick Video Generation -->
@@ -375,9 +386,14 @@
                         <div class="config-row">
                             <div class="config-item">
                                 <label for="video-artist">🎤 Artist:</label>
-                                <select id="video-artist">
-                                    <option value="random">🎲 Random Artist</option>
-                                </select>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <select id="video-artist" style="flex: 1;">
+                                        <option value="random">🎲 Random Artist</option>
+                                    </select>
+                                    <button id="refresh-artists" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;" title="Refresh Artists">
+                                        🔄
+                                    </button>
+                                </div>
                             </div>
                             <div class="config-item">
                                 <label for="video-duration">⏱️ Duration:</label>
@@ -514,6 +530,329 @@
                         </div>
                     </div>
                     <button id="cleanup-video-files" class="btn btn-secondary btn-small">🧹 Cleanup Temp Files</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Generation Tab -->
+        <div class="tab-content" id="image-tab">
+            <div class="image-generation-section">
+                <h3>🖼️ Image Generation</h3>
+                <p class="section-description">Generate custom images using AI prompts and share them across agents</p>
+
+                <!-- Quick Image Generation -->
+                <div class="quick-image-section">
+                    <h4>⚡ Quick Image Generation</h4>
+                    <div class="quick-image-card">
+                        <p>Generate a "Hello World" image with Chicago skyline prompt</p>
+                        <button id="generate-quick-image" class="btn btn-primary">
+                            <span class="generate-text">🚀 Generate Quick Image</span>
+                            <span class="generate-loading" style="display: none;">Generating...</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Image Generation -->
+                <div class="custom-image-section">
+                    <h4>🎨 Custom Image Generation</h4>
+                    
+                    <!-- Image Configuration -->
+                    <div class="image-config">
+                        <div class="config-row">
+                            <div class="config-item">
+                                <label for="image-prompt">💭 Image Prompt:</label>
+                                <textarea 
+                                    id="image-prompt" 
+                                    placeholder="Describe the image you want to generate...&#10;Examples:&#10;• A stunning Chicago skyline at sunset with modern skyscrapers&#10;• Abstract electronic music visualizer with neon colors&#10;• Minimalist DJ setup with geometric patterns&#10;• Cyberpunk cityscape with glowing neon lights"
+                                    rows="4"
+                                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; resize: vertical;"></textarea>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-item">
+                                <label for="image-style">🎨 Style:</label>
+                                <select id="image-style">
+                                    <option value="realistic" selected>Realistic</option>
+                                    <option value="artistic">Artistic</option>
+                                    <option value="abstract">Abstract</option>
+                                    <option value="minimalist">Minimalist</option>
+                                    <option value="cyberpunk">Cyberpunk</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label for="image-size">📐 Size:</label>
+                                <select id="image-size">
+                                    <option value="720x720" selected>Square (720x720)</option>
+                                    <option value="1920x1080">Widescreen (1920x1080)</option>
+                                    <option value="1080x1920">Portrait (1080x1920)</option>
+                                    <option value="1920x1920">Large Square (1920x1920)</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label for="image-quality">✨ Quality:</label>
+                                <select id="image-quality">
+                                    <option value="standard" selected>Standard</option>
+                                    <option value="high">High</option>
+                                    <option value="ultra">Ultra</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="image-generate-section">
+                        <button id="generate-custom-image" class="btn btn-accent">
+                            <span class="generate-text">🖼️ Generate Custom Image</span>
+                            <span class="generate-loading" style="display: none;">Processing...</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Image Results -->
+                <div class="image-results" id="image-results" style="display: none;">
+                    <div class="results-header">
+                        <h4>🖼️ Generated Image</h4>
+                        <div class="image-info" id="image-info">
+                            <span class="image-prompt" id="result-image-prompt"></span>
+                            <span class="image-size" id="result-image-size"></span>
+                            <span class="image-style" id="result-image-style"></span>
+                        </div>
+                    </div>
+
+                    <div class="image-content">
+                        <!-- Image Preview -->
+                        <div class="image-preview">
+                            <img id="generated-image" src="" alt="Generated Image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                        </div>
+
+                        <!-- Image Actions -->
+                        <div class="image-actions">
+                            <button id="download-image" class="btn btn-primary">💾 Download Image</button>
+                            <button id="share-image" class="btn btn-secondary">🔗 Copy Share Link</button>
+                            <button id="use-in-video" class="btn btn-accent">🎬 Use in Video</button>
+                            <button id="use-in-tweet" class="btn btn-success">📝 Use in Tweet</button>
+                        </div>
+
+                        <!-- Image Metadata -->
+                        <div class="image-metadata">
+                            <h5>📊 Image Details</h5>
+                            <div class="metadata-grid">
+                                <div class="metadata-item">
+                                    <strong>📐 Dimensions:</strong> <span id="meta-image-dimensions">-</span>
+                                </div>
+                                <div class="metadata-item">
+                                    <strong>📁 File Size:</strong> <span id="meta-image-size">-</span>
+                                </div>
+                                <div class="metadata-item">
+                                    <strong>🎨 Style:</strong> <span id="meta-image-style">-</span>
+                                </div>
+                                <div class="metadata-item">
+                                    <strong>🔗 URL:</strong> <span id="meta-image-url">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image History -->
+                <div class="image-history-section">
+                    <div class="history-header">
+                        <h4>📚 Image History</h4>
+                        <button id="refresh-image-history" class="btn btn-secondary btn-small">🔄 Refresh</button>
+                    </div>
+                    <div class="image-history" id="image-history">
+                        <div class="history-empty">
+                            <p>No images generated yet. Create your first image above!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image System Status -->
+                <div class="image-system-status">
+                    <h4>⚙️ Image System Status</h4>
+                    <div class="system-stats">
+                        <div class="system-stat">
+                            <span class="stat-label">Image Agent:</span>
+                            <span class="stat-value status-operational">✅ Ready</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">AI Model:</span>
+                            <span class="stat-value status-operational">🤖 Connected</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">Storage:</span>
+                            <span class="stat-value status-operational">💾 Available</span>
+                        </div>
+                    </div>
+                    <button id="cleanup-image-files" class="btn btn-secondary btn-small">🧹 Cleanup Image Files</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Generation Tab -->
+        <div class="tab-content" id="audio-tab">
+            <div class="audio-generation-section">
+                <h3>🎵 Audio Generation</h3>
+                <p class="section-description">Generate audio clips from Arweave network or explore artist metadata</p>
+
+                <!-- Audio Generation Controls -->
+                <div class="generation-controls">
+                    <div class="control-group">
+                        <h4>🎛️ Generation Settings</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="audio-artist-select">🎭 Artist:</label>
+                                <select id="audio-artist-select" class="form-select">
+                                    <option value="">🎲 Random Artist</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="audio-duration">⏱️ Duration (seconds):</label>
+                                <input type="number" id="audio-duration" class="form-input" value="15" min="5" max="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="audio-fade-in">📈 Fade In (seconds):</label>
+                                <input type="number" id="audio-fade-in" class="form-input" value="2" min="0" max="5" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label for="audio-fade-out">📉 Fade Out (seconds):</label>
+                                <input type="number" id="audio-fade-out" class="form-input" value="2" min="0" max="5" step="0.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="action-buttons">
+                        <button id="generate-audio-btn" class="btn btn-primary">
+                            🎵 Generate Audio Clip
+                        </button>
+                        <button id="get-metadata-btn" class="btn btn-secondary">
+                            📋 Get Artist Info Only
+                        </button>
+                        <button id="random-artist-btn" class="btn btn-accent">
+                            🎲 Random Artist Info
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Audio Results Display -->
+                <div class="audio-results" id="audio-results" style="display: none;">
+                    <div class="results-header">
+                        <h4>🎯 Generated Audio</h4>
+                        <div class="generation-status" id="audio-status">
+                            <span class="status-indicator">⏳</span>
+                            <span class="status-text">Processing...</span>
+                        </div>
+                    </div>
+
+                    <!-- Audio Player -->
+                    <div class="audio-player-section">
+                        <div class="audio-info">
+                            <div class="audio-thumbnail">
+                                <img id="audio-artist-image" src="" alt="Artist" class="artist-image" style="display: none;">
+                                <div class="audio-placeholder">🎵</div>
+                            </div>
+                            <div class="audio-details">
+                                <h5 id="audio-artist-name">Artist Name</h5>
+                                <p id="audio-mix-title">Mix Title</p>
+                                <div class="audio-meta">
+                                    <span id="audio-duration-display">0:00</span> • 
+                                    <span id="audio-file-size">0KB</span> • 
+                                    <span id="audio-format">M4A</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="audio-controls">
+                            <audio id="audio-player" controls style="width: 100%; display: none;">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Display -->
+                    <div class="metadata-display" id="metadata-display">
+                        <h5>📊 Audio Metadata</h5>
+                        <div class="metadata-grid">
+                            <div class="metadata-item">
+                                <strong>🎭 Artist:</strong> <span id="meta-artist">-</span>
+                            </div>
+                            <div class="metadata-item">
+                                <strong>🎵 Mix:</strong> <span id="meta-mix">-</span>
+                            </div>
+                            <div class="metadata-item">
+                                <strong>⏱️ Duration:</strong> <span id="meta-duration">-</span>
+                            </div>
+                            <div class="metadata-item">
+                                <strong>📅 Year:</strong> <span id="meta-year">-</span>
+                            </div>
+                            <div class="metadata-item">
+                                <strong>🎼 Genre:</strong> <span id="meta-genre">-</span>
+                            </div>
+                            <div class="metadata-item">
+                                <strong>🌐 Arweave URL:</strong> 
+                                <a id="meta-arweave-url" href="#" target="_blank" class="arweave-link">View on Arweave</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="audio-actions">
+                        <button id="download-audio" class="btn btn-primary" disabled>
+                            💾 Download Audio
+                        </button>
+                        <button id="copy-audio-link" class="btn btn-secondary" disabled>
+                            📋 Copy Link
+                        </button>
+                        <button id="regenerate-audio" class="btn btn-accent">
+                            🔄 Generate Another
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Audio History -->
+                <div class="audio-history-section">
+                    <div class="history-header">
+                        <h4>📚 Audio History</h4>
+                        <button id="refresh-audio-history" class="btn btn-secondary btn-small">🔄 Refresh</button>
+                    </div>
+                    <div class="audio-history" id="audio-history">
+                        <div class="history-empty">
+                            <p>No audio clips generated yet. Create your first clip above!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- All Artists Overview -->
+                <div class="all-artists-section">
+                    <div class="artists-header">
+                        <h4>🎭 All Available Artists</h4>
+                        <button id="load-all-artists" class="btn btn-secondary btn-small">🔄 Load Artists</button>
+                    </div>
+                    <div class="artists-overview" id="artists-overview">
+                        <div class="artists-loading">
+                            <p>Click "Load Artists" to see all available artists and their metadata.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audio System Status -->
+                <div class="audio-system-status">
+                    <h4>⚙️ Audio System Status</h4>
+                    <div class="system-stats">
+                        <div class="system-stat">
+                            <span class="stat-label">Audio Agent:</span>
+                            <span class="stat-value status-operational">✅ Ready</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">Arweave Network:</span>
+                            <span class="stat-value status-operational">🌐 Connected</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">Available Artists:</span>
+                            <span class="stat-value" id="total-artists-count">14</span>
+                        </div>
+                    </div>
+                    <button id="cleanup-audio-files" class="btn btn-secondary btn-small">🧹 Cleanup Audio Files</button>
                 </div>
             </div>
         </div>

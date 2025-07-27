@@ -2170,4 +2170,461 @@ body {
     .system-stats {
         grid-template-columns: 1fr;
     }
+}
+
+/* ============================================================================
+   AUDIO GENERATION STYLES
+   ============================================================================ */
+
+.audio-generation-section {
+    background: white;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow);
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.audio-generation-section h3 {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-description {
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+    font-size: 16px;
+}
+
+.generation-controls {
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.control-group h4 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.form-select, .form-input {
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: white;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-select:focus, .form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.action-buttons .btn {
+    min-width: 160px;
+}
+
+/* Audio Results Display */
+.audio-results {
+    background: white;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow);
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.results-header h4 {
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.generation-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.status-indicator {
+    font-size: 16px;
+}
+
+/* Audio Player Section */
+.audio-player-section {
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.audio-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.audio-thumbnail {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    background: var(--music-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    color: white;
+}
+
+.artist-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.audio-placeholder {
+    font-size: 30px;
+}
+
+.audio-details h5 {
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    font-size: 18px;
+}
+
+.audio-details p {
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.audio-meta {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.audio-controls {
+    margin-top: 15px;
+}
+
+#audio-player {
+    width: 100%;
+    border-radius: var(--border-radius);
+}
+
+/* Metadata Display */
+.metadata-display {
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.metadata-display h5 {
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.metadata-item {
+    padding: 12px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.metadata-item strong {
+    display: block;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.metadata-item span {
+    color: var(--text-secondary);
+}
+
+.arweave-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.arweave-link:hover {
+    text-decoration: underline;
+}
+
+/* Audio Actions */
+.audio-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.audio-actions .btn {
+    min-width: 140px;
+}
+
+/* Audio History */
+.audio-history-section {
+    background: white;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow);
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.history-header h4 {
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.audio-history {
+    min-height: 100px;
+}
+
+.history-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+}
+
+/* All Artists Section */
+.all-artists-section {
+    background: white;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow);
+    padding: 25px;
+    margin-bottom: 30px;
+}
+
+.artists-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.artists-header h4 {
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.artists-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    min-height: 100px;
+}
+
+.artists-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px;
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+}
+
+.artist-metadata-card {
+    background: var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.artist-metadata-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.artist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.artist-header h5 {
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.artist-genre {
+    background: var(--primary-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.artist-stats {
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    display: inline-block;
+    background: white;
+    padding: 6px 12px;
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    color: var(--text-secondary);
+    box-shadow: var(--shadow);
+}
+
+.artist-mixes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mix-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: white;
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    box-shadow: var(--shadow);
+}
+
+.mix-title {
+    color: var(--text-primary);
+    font-weight: 500;
+    flex: 1;
+}
+
+.mix-duration {
+    color: var(--text-secondary);
+    font-size: 12px;
+    background: var(--secondary-color);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+/* Audio System Status */
+.audio-system-status {
+    background: white;
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow);
+    padding: 25px;
+}
+
+.audio-system-status h4 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Audio Generation Mobile Styles */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .action-buttons .btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .audio-info {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .metadata-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .artists-overview {
+    grid-template-columns: 1fr;
+  }
+  
+  .audio-actions {
+    flex-direction: column;
+  }
+  
+  .audio-actions .btn {
+    width: 100%;
+    min-width: auto;
+  }
 } 

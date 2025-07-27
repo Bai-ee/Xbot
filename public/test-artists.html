@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artist Dropdown Test</title>
+</head>
+<body>
+    <h1>🧪 Artist Dropdown Test</h1>
+    
+    <div>
+        <label for="video-artist">🎤 Artist:</label>
+        <select id="video-artist">
+            <option value="random">🎲 Random Artist</option>
+        </select>
+    </div>
+    
+    <button onclick="loadArtists()" style="margin: 10px;">🔄 Load Artists</button>
+    <button onclick="showDropdownContent()" style="margin: 10px;">👁️ Show Dropdown Content</button>
+    
+    <div id="debug-output" style="margin-top: 20px; padding: 10px; background: #f0f0f0; font-family: monospace;"></div>
+
+    <script>
+        function log(message) {
+            console.log(message);
+            const debugDiv = document.getElementById('debug-output');
+            debugDiv.innerHTML += message + '<br>';
+        }
+
+        async function loadArtists() {
+            log('🎵 Starting artist load test...');
+            
+            try {
+                log('📡 Fetching /api/video/artists...');
+                const response = await fetch('/api/video/artists');
+                log(`📊 Response status: ${response.status}`);
+                
+                const data = await response.json();
+                log(`📋 Data received: ${JSON.stringify(data).substring(0, 100)}...`);
+                
+                if (data.success && data.artists) {
+                    log(`✅ Found ${data.artists.length} artists`);
+                    populateDropdown(data.artists);
+                } else {
+                    log('❌ API returned failure or no artists');
+                }
+                
+            } catch (error) {
+                log(`💥 Error: ${error.message}`);
+            }
+        }
+
+        function populateDropdown(artists) {
+            log('🎨 Populating dropdown...');
+            
+            const artistSelect = document.getElementById('video-artist');
+            if (!artistSelect) {
+                log('❌ Could not find video-artist element');
+                return;
+            }
+            
+            log('📋 Found dropdown element');
+            
+            // Clear and rebuild
+            artistSelect.innerHTML = '<option value="random">🎲 Random Artist</option>';
+            
+            artists.forEach((artist, index) => {
+                const option = document.createElement('option');
+                option.value = artist.name;
+                option.textContent = `🎤 ${artist.name} (${artist.genre}) - ${artist.mixCount} mixes`;
+                artistSelect.appendChild(option);
+                log(`➕ Added: ${artist.name}`);
+            });
+            
+            log(`✅ Dropdown populated with ${artists.length} artists`);
+        }
+
+        function showDropdownContent() {
+            const artistSelect = document.getElementById('video-artist');
+            if (artistSelect) {
+                log(`🔍 Dropdown has ${artistSelect.options.length} options:`);
+                for (let i = 0; i < artistSelect.options.length; i++) {
+                    log(`  ${i}: ${artistSelect.options[i].textContent}`);
+                }
+            } else {
+                log('❌ Dropdown element not found');
+            }
+        }
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            log('🚀 Page loaded - auto-loading artists...');
+            loadArtists();
+        });
+    </script>
+</body>
+</html> 

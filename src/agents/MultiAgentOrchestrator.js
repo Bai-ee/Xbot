@@ -90,11 +90,29 @@ class MultiAgentOrchestrator {
     }
 
     // Check for video generation requests
-    if (inputLower.includes('video') || inputLower.includes('arweave') || inputLower.includes('visual') || 
-        inputLower.includes('clip') || inputLower.includes('generate video') || inputLower.includes('create video')) {
+    if (inputLower.includes('video') || inputLower.includes('visual') || 
+        inputLower.includes('generate video') || inputLower.includes('create video')) {
       complexity += 2;
       suggestedAgents.push('video_generator');
       workflow = 'video_generation';
+    }
+
+    // Check for audio generation requests
+    if (inputLower.includes('audio') || inputLower.includes('arweave') || inputLower.includes('clip') ||
+        inputLower.includes('sound') || inputLower.includes('music') || inputLower.includes('generate audio') || 
+        inputLower.includes('create audio')) {
+      complexity += 2;
+      suggestedAgents.push('audio_generator');
+      workflow = 'audio_generation';
+    }
+
+    // Check for image generation requests
+    if (inputLower.includes('image') || inputLower.includes('picture') || inputLower.includes('visual') ||
+        inputLower.includes('generate image') || inputLower.includes('create image') || 
+        inputLower.includes('background') || inputLower.includes('chicago skyline')) {
+      complexity += 2;
+      suggestedAgents.push('image_generator');
+      workflow = 'image_generation';
     }
 
     // Check for comprehensive content strategy requests
@@ -108,7 +126,8 @@ class MultiAgentOrchestrator {
     // Check for multi-step indicators
     const multiStepIndicators = [
       'analyze and create', 'research then', 'first...then', 'step by step',
-      'optimize and improve', 'create and schedule', 'complete solution'
+      'optimize and improve', 'create and schedule', 'complete solution',
+      'first generate', 'then create', 'then use', 'using that', 'exact audio'
     ];
     
     const hasMultiStep = multiStepIndicators.some(indicator => inputLower.includes(indicator));
@@ -129,9 +148,15 @@ class MultiAgentOrchestrator {
 
     // Special handling for video generation
     if (suggestedAgents.includes('video_generator')) {
-      workflow = 'video_generation';
-      // Video generation can be complex, but handled by single specialized agent
-      requiresMultiAgent = false;
+      // If both audio and video are requested, use sequential workflow for sharing
+      if (suggestedAgents.includes('audio_generator')) {
+        workflow = 'sequential';
+        requiresMultiAgent = true;
+      } else {
+        workflow = 'video_generation';
+        // Video generation can be complex, but handled by single specialized agent
+        requiresMultiAgent = false;
+      }
     }
 
     // Ensure we have at least one agent if none were identified
@@ -421,6 +446,18 @@ class MultiAgentOrchestrator {
         videoPath: result.videoPath,
         videoWorkflow: result.workflow,
         artist: result.metadata?.artist
+      },
+      audio_generator: {
+        audioPath: result.audioPath,
+        audioUrl: result.url,
+        audioFileName: result.fileName,
+        audioArtist: result.artist,
+        audioMixTitle: result.mixTitle,
+        audioDuration: result.duration,
+        audioFileSize: result.fileSize,
+        audioArweaveUrl: result.arweaveUrl,
+        audioMetadata: result.metadata,
+        audioType: result.type
       }
     };
 

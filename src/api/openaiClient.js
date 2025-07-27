@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 const { environmentConfig } = require('../config/environment.js');
+const { RECOMMENDED_PROMPT_PREFIX } = require('../agents/HandoffManager.js');
 
 class OpenAIClient {
   constructor() {
@@ -95,11 +96,21 @@ class OpenAIClient {
 
   createSpecializedPrompt(agentType, input, context = {}) {
     const prompts = {
-      'content_creator': `You are a specialized Twitter content creator. Create engaging, authentic Twitter content.
+      'content_creator': `${RECOMMENDED_PROMPT_PREFIX}You are a specialized Twitter content creator. Create engaging, authentic Twitter content.
         
 Task: ${input}
 
 Context: ${JSON.stringify(context, null, 2)}
+
+${context.audioContext ? `
+🎵 AUDIO CONTEXT AVAILABLE:
+- Artist: ${context.audioContext.audioArtist}
+- Mix: ${context.audioContext.audioMixTitle}
+- Duration: ${context.audioContext.audioDuration}s
+- File: ${context.audioContext.audioFileName}
+
+Use this audio information to create content that references the specific artist and mix when relevant.
+` : ''}
 
 Guidelines:
 - Keep tweets under 280 characters
@@ -107,6 +118,7 @@ Guidelines:
 - Include emojis for engagement
 - Match the user's authentic voice
 - Focus on value and engagement
+${context.audioContext ? '- Reference the audio content when appropriate' : ''}
 
 Create compelling Twitter content:`,
 

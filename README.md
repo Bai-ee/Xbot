@@ -1,154 +1,302 @@
-# 🎵 Creative Tech DJ Twitter Bot
+# 🎬 Creative Tech DJ Twitter Bot
 
-*A sophisticated Twitter automation dashboard with AI assistant capabilities*
+A comprehensive X Premium+ posting bot for DJs and Creative-Tech users with advanced video generation capabilities, web dashboard, and multi-agent orchestration.
 
-<!-- Railway deployment trigger: OpenAI integration update -->
+## 🚀 Features
 
-Automated content engine for DJs and Creative-Tech users using X Premium+ tools. Features a modern web dashboard for tweet approval and monitoring before posting.
+### Core Functionality
+- **Automated Social Media Posting**: Intelligent content generation and scheduling
+- **Multi-Agent System**: Orchestrated AI agents for content creation, video generation, and social media management
+- **Web Dashboard**: Real-time monitoring and control interface
+- **Arweave Integration**: Decentralized audio content from the Arweave network
 
-## ✨ Features
+### 🎬 Video Generation System
+- **Professional Video Creation**: Generate branded videos with audio from Arweave
+- **AI Background Generation**: Dynamic visual backgrounds using OpenAI
+- **Multiple Video Styles**: Enhanced layouts with artist branding
+- **Real-time Processing**: Live video generation with progress tracking
+- **High-Quality Output**: 4K-ready video composition with professional encoding
 
-- 🎵 **Curated DJ Content**: Pre-built tweet templates for DJs and creative tech users
-- 🌐 **Web Dashboard**: Beautiful interface to monitor, edit, and approve tweets
-- ✅ **Tweet Approval System**: Review and edit tweets before they go live
-- 📊 **Analytics**: Track pending tweets, posted tweets, and queue statistics
-- 🔄 **Real-time Updates**: Dashboard updates automatically every 30 seconds
-- 🎯 **Character Count**: Real-time character counting with Twitter limit validation
-- 🚀 **Railway Ready**: Pre-configured for easy deployment to Railway
+### 🤖 AI Agents
+- **ContentCreator**: Generates engaging social media content
+- **ArweaveVideoAgent**: Handles video generation workflows
+- **ImageGenerationAgent**: Creates custom visual assets
+- **MultiAgentOrchestrator**: Coordinates complex multi-step workflows
 
-## 🎬 Quick Start
+## 📋 Requirements
 
-### 1. Install Dependencies
+### System Requirements
+- **Node.js**: 18.0+ (LTS recommended)
+- **FFmpeg**: 4.0+ (for audio/video processing)
+- **Chrome/Chromium**: Latest (for Puppeteer rendering)
+- **RAM**: 8GB minimum, 16GB recommended
+- **Storage**: 5GB free space for dependencies + output files
+
+### API Keys Required
+- **OpenAI API Key**: For AI content generation and background creation
+- **Twitter API Keys**: For social media posting (optional)
+
+## 🛠️ Installation
+
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd creative-tech-dj-twitter-bot
+```
+
+### 2. Install Dependencies
 ```bash
 npm install
 ```
 
-### 2. Set Up Twitter API Credentials
-1. Visit [Twitter Developer Portal](https://developer.x.com)
-2. Create a new app and generate API keys
-3. Your `.env` file is already configured with your credentials
-
-### 3. Launch the Web Dashboard
+### 3. Configure Environment
+Create a `.env` file in the root directory:
 ```bash
+# Required API Keys
+OPENAI_API_KEY=sk-proj-your_openai_api_key_here
+
+# Optional Twitter API Keys (for social media posting)
+TWITTER_API_KEY=your_twitter_api_key
+TWITTER_API_SECRET=your_twitter_api_secret
+TWITTER_ACCESS_TOKEN=your_twitter_access_token
+TWITTER_ACCESS_SECRET=your_twitter_access_secret
+
+# Optional Configuration
+NODE_ENV=development
+PORT=3000
+```
+
+### 4. Install System Dependencies
+```bash
+# macOS (via Homebrew)
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# Windows (via Chocolatey)
+choco install ffmpeg
+```
+
+## 🚀 Usage
+
+### Start the Application
+```bash
+# Development mode
+npm run dev
+
+# Production mode
 npm start
 ```
 
-Open http://localhost:3000 to access your dashboard!
+### Test Audio Generation
+```bash
+# Quick test
+npm run test-audio
 
-## 🌐 Web Dashboard Features
-
-### Tweet Management
-- **Generate Tweets**: Create new DJ-focused content with one click
-- **Edit Tweets**: Modify content directly in the dashboard
-- **Approve & Post**: Review and approve tweets before they go live
-- **Real-time Character Count**: See exactly how many characters you're using
-- **Queue Management**: View all pending and posted tweets
-
-### Dashboard Sections
-- **Stats Overview**: See pending tweets, posted today, and total queue
-- **Tweet Queue**: All your tweets organized by status (pending first)
-- **Real-time Updates**: Data refreshes automatically
-- **Toast Notifications**: Get instant feedback on all actions
-
-## 🎵 Using the Bot
-
-### Generate Tweet
-Click "Generate New Tweet" to create a random DJ-focused tweet from templates.
-
-### Edit Content
-Click in any tweet text area to edit the content. Changes save automatically.
-
-### Approve & Post
-Click "Approve & Post" to send the tweet to Twitter immediately.
-
-### Reject Tweet
-Click "Reject" to remove a tweet from the queue without posting.
-
-## 🚀 Deploy to Railway
-
-### 1. Connect to Railway
-1. Go to [Railway.app](https://railway.app)
-2. Connect your GitHub repository
-3. Click "Deploy Now"
-
-### 2. Set Environment Variables
-In Railway dashboard, add these environment variables:
-```env
-TWITTER_API_KEY=9wJwJdKGRi5mIc5kefAAZyjC7
-TWITTER_API_SECRET=XouT4JAW5oAridbvJKWGMUdqo9s6heetokRKhgiUCXAk1Vt8RY
-ACCESS_TOKEN=18508964-le8C1iwlotI3FZxy3NSWOVo8iM5jjpAbbdqOm3K0f
-ACCESS_SECRET=I2LUde9Mx1DcTw6oFuXoi57YIBCMAYuWM4SaQky40RSSo
-PORT=8080
+# Full test with cleanup
+npm run test-audio-full
 ```
 
-### 3. Deploy!
-Railway will automatically deploy your bot with the web dashboard.
+### Test Video Generation
+```bash
+npm run test-video
+```
 
-## 🛠 Customization
+### Clean Temporary Files
+```bash
+npm run clean
+```
 
-### Edit Tweet Templates
-Modify the `djTweets` array in `server.js`:
+## 🎬 Video Generation
+
+### Basic Video Generation
+The system can generate professional videos by:
+1. **Pulling audio from Arweave**: Downloads segments from decentralized storage
+2. **Creating visual layouts**: Generates branded layouts with artist information
+3. **Compositing final video**: Combines audio and visuals with professional encoding
+
+### Video Generation Process
 ```javascript
-const djTweets = [
-  "🎶 Your custom DJ content here! #YourHashtags",
-  "🔥 Add your show announcements and mix releases",
-  // Add more templates...
-];
+const { ArweaveVideoGenerator } = require('./src/lib/ArweaveVideoGenerator');
+
+const generator = new ArweaveVideoGenerator();
+const result = await generator.generateVideoWithAudio(30); // 30-second video
 ```
 
-### Styling
-Edit `public/style.css` to customize the dashboard appearance.
+### Supported Video Styles
+- **Enhanced Classic**: Traditional layout with artist branding
+- **Hierarchical Artist-Focused**: Artist-centric design
+- **Hierarchical Logo-Focused**: Logo-centric design
 
-### Functionality
-Modify `public/script.js` to add new features to the dashboard.
+## 🤖 Multi-Agent System
 
-## 📱 API Endpoints
+### Agent Types
+- **ContentCreator**: Generates social media content and captions
+- **ArweaveVideoAgent**: Handles video generation workflows
+- **ImageGenerationAgent**: Creates custom visual assets
+- **MultiAgentOrchestrator**: Coordinates complex workflows
 
-The bot includes a full REST API:
+### Workflow Types
+- **Parallel**: Multiple agents work simultaneously
+- **Sequential**: Agents work in sequence
+- **Video Generation**: Specialized workflow for video creation
 
-- `GET /` - Web dashboard
-- `GET /api/tweets` - Get all tweets
-- `POST /api/generate` - Generate new tweet
-- `PUT /api/tweets/:id` - Update tweet content
-- `POST /api/tweets/:id/approve` - Approve and post tweet
-- `POST /api/tweets/:id/reject` - Reject tweet
-- `DELETE /api/tweets/posted` - Clear posted tweets
-- `GET /health` - Health check
+### Example Usage
+```javascript
+const { MultiAgentOrchestrator } = require('./src/agents/MultiAgentOrchestrator');
 
-## 💡 Pro Tips
+const orchestrator = new MultiAgentOrchestrator();
+const result = await orchestrator.processRequest(
+  "Create a 30-second video with Chicago skyline background"
+);
+```
 
-### Content Strategy
-- **Personalize Templates**: Replace generic content with your specific shows, releases, and venues
-- **Use Hashtags**: Include genre-specific hashtags like #TechHouse, #DeepHouse, #CreativeTech
-- **Show Announcements**: Add upcoming gigs and event details
-- **Behind-the-Scenes**: Share studio sessions and production insights
+## 🌐 Web Dashboard
 
-### Scheduling
-- **Manual Mode**: Use the dashboard to approve tweets as needed
-- **Batch Approval**: Generate multiple tweets and approve them when ready
-- **Strategic Timing**: Approve tweets during peak engagement hours
+### Access the Dashboard
+1. Start the application: `npm run dev`
+2. Open your browser to: `http://localhost:3000`
+3. Navigate to the dashboard interface
 
-### Railway Production
-- **Environment Variables**: All credentials are safely stored in Railway
-- **Auto-scaling**: Railway handles traffic spikes automatically
-- **Custom Domain**: Connect your own domain in Railway settings
-- **SSL**: HTTPS is automatically enabled
+### Dashboard Features
+- **Real-time Monitoring**: Live status of agents and processes
+- **Content Management**: View and manage generated content
+- **Video Generation**: Trigger and monitor video creation
+- **System Status**: Check system health and dependencies
 
-## 🎯 Dashboard Commands
+## 📁 Project Structure
 
-- **Generate New Tweet**: Creates a random DJ-focused tweet
-- **Clear Posted**: Removes all posted tweets from the queue
-- **Edit Tweet**: Click in text area to modify content
-- **Approve & Post**: Sends tweet to Twitter immediately
-- **Reject**: Removes tweet without posting
+```
+creative-tech-dj-twitter-bot/
+├── src/
+│   ├── agents/                 # AI agent implementations
+│   │   ├── BaseAgent.js       # Base agent class
+│   │   ├── ContentCreator.js  # Content generation agent
+│   │   ├── ArweaveVideoAgent.js # Video generation agent
+│   │   └── MultiAgentOrchestrator.js # Workflow coordination
+│   ├── lib/                   # Core libraries
+│   │   ├── ArweaveAudioClient.js # Audio processing
+│   │   ├── ArweaveVideoGenerator.js # Video generation
+│   │   └── ImageGenerator.js  # AI image generation
+│   └── api/                   # API integrations
+├── content/                   # Generated content storage
+│   └── audio/                # Audio clips from Arweave
+├── outputs/                   # Generated videos and assets
+├── public/                    # Web dashboard files
+├── data/                      # Configuration and data files
+└── docs/                      # Documentation
+```
+
+## 🔧 Configuration
+
+### Artist Database
+The system uses a JSON database of artists and their mixes. See `data/sample-artists.json` for the format.
+
+### Video Settings
+- **Default Duration**: 30 seconds
+- **Fade Effects**: 2-second fade in/out
+- **Output Format**: MP4 with AAC audio
+- **Quality**: High-quality encoding for social media
+
+### Agent Configuration
+- **Retry Logic**: Automatic retry with exponential backoff
+- **Timeout Settings**: Configurable timeouts for network operations
+- **Error Handling**: Comprehensive error handling and recovery
+
+## 🧪 Testing
+
+### Run Tests
+```bash
+# Test audio generation
+npm run test-audio-full
+
+# Test video generation
+npm run test-video
+
+# Test specific components
+node test-audio-generation.js
+```
+
+### Test Coverage
+- Audio generation from Arweave
+- Video composition and encoding
+- Multi-agent orchestration
+- Error handling and recovery
+- Network resilience
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### FFmpeg Not Found
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu
+sudo apt-get install ffmpeg
+
+# Verify installation
+ffmpeg -version
+```
+
+#### Audio Generation Fails
+- Check Arweave URLs in artist database
+- Verify network connectivity
+- Check FFmpeg installation
+- Review error logs for specific issues
+
+#### Video Generation Issues
+- Ensure sufficient disk space
+- Check Puppeteer/Chrome installation
+- Verify OpenAI API key configuration
+- Review system resources
+
+### Debug Mode
+Enable debug logging by setting `NODE_ENV=development` in your `.env` file.
+
+## 📈 Performance
+
+### Optimization Tips
+- Use shorter clip durations for faster processing
+- Implement parallel processing for batch operations
+- Cache frequently accessed Arweave URLs
+- Monitor system resources during processing
+
+### Resource Usage
+- **Memory**: 2-4GB during video generation
+- **CPU**: Multi-core utilization for parallel processing
+- **Storage**: Temporary files cleaned up automatically
+- **Network**: Efficient segment downloading from Arweave
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- **Arweave**: Decentralized storage for audio content
+- **OpenAI**: AI-powered content generation
+- **FFmpeg**: Audio/video processing
+- **Puppeteer**: Web rendering for video generation
+
+## 📞 Support
+
+For support and questions:
+- Check the troubleshooting section
+- Review the documentation
+- Open an issue on GitHub
+- Contact the development team
 
 ---
 
-**🎵 Your Creative Tech DJ Twitter Bot is ready to build your audience!** 🎶🤖
-
-**Local Dashboard**: http://localhost:3000  
-**Railway Deploy**: Ready for production deployment  
-**Tweet Approval**: Full control over your content  
-
-Happy DJing! 🎧✨# Xbot
-Railway deployment trigger: Updated OPENAI_API_KEY Sat Jul 26 22:51:48 CDT 2025
+**🎉 Ready to create amazing content with AI-powered video generation!**

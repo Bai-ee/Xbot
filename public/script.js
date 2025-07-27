@@ -143,7 +143,18 @@ class TwitterBotDashboard {
                 this.loadProfile();
                 break;
             case 'video':
-                this.initializeVideoGeneration();
+                console.log('🎬 Switching to video tab - initializing video generation');
+                // Small delay to ensure DOM elements are fully rendered
+                setTimeout(() => {
+                    this.initializeVideoGeneration();
+                }, 100);
+                break;
+            case 'audio':
+                console.log('🎵 Switching to audio tab - initializing audio generation');
+                // Small delay to ensure DOM elements are fully rendered
+                setTimeout(() => {
+                    this.initializeAudioGeneration();
+                }, 100);
                 break;
         }
     }
@@ -1203,6 +1214,16 @@ class TwitterBotDashboard {
             this.loadQueue();
         } else if (tabName === 'analytics') {
             this.loadAnalytics();
+        } else if (tabName === 'video') {
+            console.log('🎬 Switching to video tab - initializing video generation');
+            setTimeout(() => {
+                this.initializeVideoGeneration();
+            }, 100);
+        } else if (tabName === 'audio') {
+            console.log('🎵 Switching to audio tab - initializing audio generation');
+            setTimeout(() => {
+                this.initializeAudioGeneration();
+            }, 100);
         }
     }
 
@@ -1757,6 +1778,9 @@ class TwitterBotDashboard {
         const customVideoBtn = document.getElementById('generate-custom-video');
         const regenerateBtn = document.getElementById('regenerate-video');
         const refreshHistoryBtn = document.getElementById('refresh-video-history');
+        const testPipelineBtn = document.getElementById('test-pipeline');
+        const refreshArtistsBtn = document.getElementById('refresh-artists');
+        const testComponentsBtn = document.getElementById('test-components');
         const cleanupBtn = document.getElementById('cleanup-video-files');
 
         if (quickVideoBtn) {
@@ -1779,16 +1803,40 @@ class TwitterBotDashboard {
             cleanupBtn.addEventListener('click', () => this.cleanupVideoFiles());
         }
 
+        if (refreshArtistsBtn) {
+            refreshArtistsBtn.addEventListener('click', () => {
+                console.log('🔄 Manual artist refresh requested');
+                refreshArtistsBtn.textContent = '⏳';
+                refreshArtistsBtn.disabled = true;
+                
+                this.loadAvailableArtists().then(() => {
+                    refreshArtistsBtn.textContent = '🔄';
+                    refreshArtistsBtn.disabled = false;
+                    this.showToast('✅ Artists refreshed successfully!', 'success');
+                }).catch((error) => {
+                    refreshArtistsBtn.textContent = '🔄';
+                    refreshArtistsBtn.disabled = false;
+                    this.showToast('❌ Failed to refresh artists', 'error');
+                    console.error('Failed to refresh artists:', error);
+                });
+            });
+        }
+
         // Load video history on initialization
         this.loadVideoHistory();
     }
 
     async loadAvailableArtists() {
+        console.log('🎵 Loading available artists...');
         try {
             const response = await fetch('/api/video/artists');
+            console.log('📡 API response status:', response.status);
+            
             const data = await response.json();
+            console.log('📊 API data received:', data);
 
             if (data.success) {
+                console.log(`✅ Successfully loaded ${data.artists.length} artists`);
                 this.populateArtistSelect(data.artists);
                 this.displayArtistsGrid(data.artists);
             } else {
@@ -1799,20 +1847,42 @@ class TwitterBotDashboard {
         }
     }
 
-    populateArtistSelect(artists) {
+    populateArtistSelect(artists, retryCount = 0) {
+        console.log(`🎨 Populating artist select dropdown (attempt ${retryCount + 1})...`);
         const artistSelect = document.getElementById('video-artist');
-        if (!artistSelect) return;
+        
+        if (!artistSelect) {
+            console.error(`❌ Could not find video-artist dropdown element (attempt ${retryCount + 1})`);
+            
+            // Retry up to 3 times with increasing delays
+            if (retryCount < 3) {
+                const delay = (retryCount + 1) * 200; // 200ms, 400ms, 600ms
+                console.log(`🔄 Retrying in ${delay}ms...`);
+                setTimeout(() => {
+                    this.populateArtistSelect(artists, retryCount + 1);
+                }, delay);
+            } else {
+                console.error('❌ Failed to find dropdown element after 3 attempts');
+            }
+            return;
+        }
+
+        console.log('📋 Found dropdown element, adding options...');
 
         // Clear existing options except "random"
         artistSelect.innerHTML = `<option value="random">🎲 Random Artist</option>`;
 
         // Add artist options
-        artists.forEach(artist => {
+        artists.forEach((artist, index) => {
             const option = document.createElement('option');
             option.value = artist.name;
-            option.textContent = `🎤 ${artist.name} (${artist.genre})`;
+            option.textContent = `🎤 ${artist.name} (${artist.genre}) - ${artist.mixCount} mixes`;
             artistSelect.appendChild(option);
+            console.log(`➕ Added artist ${index + 1}: ${artist.name}`);
         });
+
+        console.log(`✅ Populated artist select with ${artists.length} real artists from Arweave network`);
+        console.log('🔍 Final dropdown innerHTML:', artistSelect.innerHTML.substring(0, 200) + '...');
     }
 
     displayArtistsGrid(artists) {
@@ -1838,6 +1908,12 @@ class TwitterBotDashboard {
         const generateText = quickVideoBtn?.querySelector('.generate-text');
         const generateLoading = quickVideoBtn?.querySelector('.generate-loading');
 
+        // Get form values for quick video
+        const artist = document.getElementById('video-artist')?.value || 'random';
+        const duration = parseInt(document.getElementById('video-duration')?.value) || 30;
+
+        console.log(`🚀 Quick video generation starting: ${artist}, ${duration}s`);
+
         try {
             this.setVideoGenerationLoading(true, quickVideoBtn, generateText, generateLoading);
 
@@ -1845,10 +1921,15 @@ class TwitterBotDashboard {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                    artist: artist,
+                    duration: duration
+                })
             });
 
             const data = await response.json();
+            console.log('Quick video response:', data);
 
             if (data.success) {
                 this.displayVideoResult(data.video, data.workflow, data.metadata);
@@ -1884,7 +1965,9 @@ class TwitterBotDashboard {
         try {
             this.setVideoGenerationLoading(true, customVideoBtn, generateText, generateLoading);
 
-            const response = await fetch('/api/generate-video', {
+            console.log(`🎬 Custom video generation starting:`, { prompt, artist, duration, style });
+
+            const response = await fetch('/api/video/custom', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -2040,6 +2123,736 @@ class TwitterBotDashboard {
 
         if (loadingElement) {
             loadingElement.style.display = loading ? 'inline' : 'none';
+        }
+    }
+
+    // ============================================================================
+    // AUDIO GENERATION FUNCTIONALITY
+    // ============================================================================
+
+    initializeAudioGeneration() {
+        console.log('🎵 Initializing audio generation...');
+        
+        // Load available artists for audio generation
+        this.loadAudioArtists();
+        
+        // Setup audio generation event listeners
+        const generateAudioBtn = document.getElementById('generate-audio-btn');
+        const getMetadataBtn = document.getElementById('get-metadata-btn');
+        const randomArtistBtn = document.getElementById('random-artist-btn');
+        const loadAllArtistsBtn = document.getElementById('load-all-artists');
+        const refreshAudioHistoryBtn = document.getElementById('refresh-audio-history');
+        const cleanupAudioBtn = document.getElementById('cleanup-audio-files');
+        
+        // Action buttons
+        const downloadAudioBtn = document.getElementById('download-audio');
+        const copyAudioLinkBtn = document.getElementById('copy-audio-link');
+        const regenerateAudioBtn = document.getElementById('regenerate-audio');
+
+        if (generateAudioBtn) {
+            generateAudioBtn.addEventListener('click', () => this.generateAudioClip());
+        }
+
+        if (getMetadataBtn) {
+            getMetadataBtn.addEventListener('click', () => this.getArtistMetadata());
+        }
+
+        if (randomArtistBtn) {
+            randomArtistBtn.addEventListener('click', () => this.getRandomArtistInfo());
+        }
+
+        if (loadAllArtistsBtn) {
+            loadAllArtistsBtn.addEventListener('click', () => this.loadAllArtistsMetadata());
+        }
+
+        if (refreshAudioHistoryBtn) {
+            refreshAudioHistoryBtn.addEventListener('click', () => this.loadAudioHistory());
+        }
+
+        if (cleanupAudioBtn) {
+            cleanupAudioBtn.addEventListener('click', () => this.cleanupAudioFiles());
+        }
+
+        if (downloadAudioBtn) {
+            downloadAudioBtn.addEventListener('click', () => this.downloadAudio());
+        }
+
+        if (copyAudioLinkBtn) {
+            copyAudioLinkBtn.addEventListener('click', () => this.copyAudioLink());
+        }
+
+        if (regenerateAudioBtn) {
+            regenerateAudioBtn.addEventListener('click', () => this.regenerateAudio());
+        }
+
+        console.log('✅ Audio generation initialized');
+    }
+
+    async loadAudioArtists() {
+        try {
+            console.log('🎭 Loading artists for audio generation...');
+            
+            const response = await fetch('/api/audio/artists');
+            const result = await response.json();
+            
+            if (result.success && result.data.success) {
+                const artists = result.data.artists;
+                const audioArtistSelect = document.getElementById('audio-artist-select');
+                
+                if (audioArtistSelect) {
+                    // Clear existing options except random
+                    audioArtistSelect.innerHTML = '<option value="">🎲 Random Artist</option>';
+                    
+                    // Add artists
+                    artists.forEach(artist => {
+                        const option = document.createElement('option');
+                        option.value = artist.name;
+                        option.textContent = `${artist.name} (${artist.totalMixes} mixes)`;
+                        audioArtistSelect.appendChild(option);
+                    });
+                    
+                    console.log(`✅ Loaded ${artists.length} artists for audio generation`);
+                }
+                
+                // Update total artists count
+                const totalArtistsCount = document.getElementById('total-artists-count');
+                if (totalArtistsCount) {
+                    totalArtistsCount.textContent = artists.length;
+                }
+                
+            } else {
+                throw new Error(result.error || 'Failed to load artists');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error loading audio artists:', error);
+            this.showToast('Failed to load artists: ' + error.message, 'error');
+        }
+    }
+
+    async generateAudioClip() {
+        try {
+            console.log('🎵 Generating audio clip...');
+            
+            const artist = document.getElementById('audio-artist-select').value;
+            const duration = parseInt(document.getElementById('audio-duration').value) || 15;
+            const fadeIn = parseFloat(document.getElementById('audio-fade-in').value) || 2;
+            const fadeOut = parseFloat(document.getElementById('audio-fade-out').value) || 2;
+            
+            // Show loading state
+            this.showAudioLoading(true);
+            this.updateAudioStatus('⏳', 'Generating audio clip...');
+            
+            const response = await fetch('/api/audio/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    artist: artist || null,
+                    duration,
+                    fadeIn,
+                    fadeOut
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.audio) {
+                console.log('✅ Audio generated successfully');
+                this.displayAudioResult(result.audio, result.metadata);
+                this.updateAudioStatus('✅', 'Audio generated successfully!');
+                this.showToast(`Audio clip generated: ${result.audio.artist} - ${result.audio.mixTitle}`, 'success');
+            } else {
+                throw new Error(result.error || 'Audio generation failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Audio generation error:', error);
+            this.updateAudioStatus('❌', 'Audio generation failed');
+            this.showToast('Audio generation failed: ' + error.message, 'error');
+        } finally {
+            this.showAudioLoading(false);
+        }
+    }
+
+    async getArtistMetadata() {
+        try {
+            console.log('📋 Getting artist metadata...');
+            
+            const artist = document.getElementById('audio-artist-select').value;
+            
+            // Show loading state
+            this.showAudioLoading(true);
+            this.updateAudioStatus('⏳', 'Fetching artist metadata...');
+            
+            const response = await fetch('/api/audio/metadata', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    artist: artist || null
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                console.log('✅ Metadata retrieved successfully');
+                this.displayArtistMetadata(result.data);
+                this.updateAudioStatus('✅', 'Metadata retrieved successfully!');
+                this.showToast(`Metadata retrieved: ${result.data.artist}`, 'success');
+            } else {
+                throw new Error(result.error || 'Metadata retrieval failed');
+            }
+            
+        } catch (error) {
+            console.error('❌ Metadata retrieval error:', error);
+            this.updateAudioStatus('❌', 'Metadata retrieval failed');
+            this.showToast('Metadata retrieval failed: ' + error.message, 'error');
+        } finally {
+            this.showAudioLoading(false);
+        }
+    }
+
+    async getRandomArtistInfo() {
+        try {
+            console.log('🎲 Getting random artist info...');
+            
+            // Clear artist selection to ensure random
+            document.getElementById('audio-artist-select').value = '';
+            
+            // Use metadata endpoint for random artist
+            await this.getArtistMetadata();
+            
+        } catch (error) {
+            console.error('❌ Random artist info error:', error);
+            this.showToast('Failed to get random artist info: ' + error.message, 'error');
+        }
+    }
+
+    async loadAllArtistsMetadata() {
+        try {
+            console.log('🎭 Loading all artists metadata...');
+            
+            const loadButton = document.getElementById('load-all-artists');
+            if (loadButton) {
+                loadButton.textContent = '⏳';
+                loadButton.disabled = true;
+            }
+            
+            const response = await fetch('/api/audio/artists');
+            const result = await response.json();
+            
+            if (result.success && result.data.success) {
+                this.displayAllArtistsMetadata(result.data.artists);
+                this.showToast(`Loaded metadata for ${result.data.totalArtists} artists`, 'success');
+            } else {
+                throw new Error(result.error || 'Failed to load all artists metadata');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error loading all artists metadata:', error);
+            this.showToast('Failed to load artists metadata: ' + error.message, 'error');
+        } finally {
+            const loadButton = document.getElementById('load-all-artists');
+            if (loadButton) {
+                loadButton.textContent = '🔄 Load Artists';
+                loadButton.disabled = false;
+            }
+        }
+    }
+
+    displayAudioResult(audio, metadata) {
+        // Show results section
+        const resultsSection = document.getElementById('audio-results');
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+        }
+        
+        // Update audio info
+        document.getElementById('audio-artist-name').textContent = audio.artist;
+        document.getElementById('audio-mix-title').textContent = audio.mixTitle;
+        document.getElementById('audio-duration-display').textContent = this.formatDuration(audio.duration);
+        document.getElementById('audio-file-size').textContent = audio.fileSize;
+        
+        // Setup audio player
+        const audioPlayer = document.getElementById('audio-player');
+        if (audioPlayer && audio.url) {
+            audioPlayer.src = audio.url;
+            audioPlayer.style.display = 'block';
+        }
+        
+        // Update metadata
+        if (metadata) {
+            document.getElementById('meta-artist').textContent = audio.artist;
+            document.getElementById('meta-mix').textContent = audio.mixTitle;
+            document.getElementById('meta-duration').textContent = audio.duration + 's';
+            document.getElementById('meta-year').textContent = metadata.generated ? new Date(metadata.generated).getFullYear() : '-';
+            document.getElementById('meta-genre').textContent = metadata.genre || '-';
+            
+            const arweaveLink = document.getElementById('meta-arweave-url');
+            if (arweaveLink && metadata.arweaveUrl) {
+                arweaveLink.href = metadata.arweaveUrl;
+                arweaveLink.textContent = 'View on Arweave';
+            }
+        }
+        
+        // Enable action buttons
+        document.getElementById('download-audio').disabled = false;
+        document.getElementById('copy-audio-link').disabled = false;
+        
+        // Store current audio data
+        this.currentAudio = audio;
+    }
+
+    displayArtistMetadata(data) {
+        // Show results section
+        const resultsSection = document.getElementById('audio-results');
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+        }
+        
+        // Hide audio player for metadata-only requests
+        const audioPlayer = document.getElementById('audio-player');
+        if (audioPlayer) {
+            audioPlayer.style.display = 'none';
+        }
+        
+        // Update artist info (metadata-only display)
+        document.getElementById('audio-artist-name').textContent = data.artist;
+        document.getElementById('audio-mix-title').textContent = data.mixTitle;
+        document.getElementById('audio-duration-display').textContent = data.mixDuration;
+        document.getElementById('audio-file-size').textContent = 'Metadata Only';
+        
+        // Update detailed metadata
+        document.getElementById('meta-artist').textContent = data.artist;
+        document.getElementById('meta-mix').textContent = data.mixTitle;
+        document.getElementById('meta-duration').textContent = data.mixDuration;
+        document.getElementById('meta-year').textContent = data.mixDateYear || '-';
+        document.getElementById('meta-genre').textContent = data.mixGenre || '-';
+        
+        const arweaveLink = document.getElementById('meta-arweave-url');
+        if (arweaveLink && data.arweaveUrl) {
+            arweaveLink.href = data.arweaveUrl;
+            arweaveLink.textContent = 'View on Arweave';
+        }
+        
+        // Disable download/copy for metadata-only
+        document.getElementById('download-audio').disabled = true;
+        document.getElementById('copy-audio-link').disabled = true;
+        
+        // Clear current audio data
+        this.currentAudio = null;
+    }
+
+    displayAllArtistsMetadata(artists) {
+        const artistsOverview = document.getElementById('artists-overview');
+        if (!artistsOverview) return;
+        
+        artistsOverview.innerHTML = '';
+        
+        artists.forEach(artist => {
+            const artistCard = document.createElement('div');
+            artistCard.className = 'artist-metadata-card';
+            artistCard.innerHTML = `
+                <div class="artist-header">
+                    <h5>${artist.name}</h5>
+                    <span class="artist-genre">${artist.genre}</span>
+                </div>
+                <div class="artist-stats">
+                    <span class="stat-item">📼 ${artist.totalMixes} mixes</span>
+                </div>
+                <div class="artist-mixes">
+                    ${artist.mixes.slice(0, 3).map(mix => `
+                        <div class="mix-item">
+                            <span class="mix-title">${mix.title}</span>
+                            <span class="mix-duration">${mix.duration}</span>
+                        </div>
+                    `).join('')}
+                    ${artist.mixes.length > 3 ? `<div class="mix-item">... and ${artist.mixes.length - 3} more</div>` : ''}
+                </div>
+            `;
+            artistsOverview.appendChild(artistCard);
+        });
+    }
+
+    showAudioLoading(loading) {
+        const generateBtn = document.getElementById('generate-audio-btn');
+        const metadataBtn = document.getElementById('get-metadata-btn');
+        const randomBtn = document.getElementById('random-artist-btn');
+
+        if (generateBtn) {
+            generateBtn.disabled = loading;
+            generateBtn.textContent = loading ? '⏳ Generating...' : '🎵 Generate Audio Clip';
+        }
+
+        if (metadataBtn) {
+            metadataBtn.disabled = loading;
+            metadataBtn.textContent = loading ? '⏳ Loading...' : '📋 Get Artist Info Only';
+        }
+
+        if (randomBtn) {
+            randomBtn.disabled = loading;
+            randomBtn.textContent = loading ? '⏳ Loading...' : '🎲 Random Artist Info';
+        }
+    }
+
+    updateAudioStatus(indicator, text) {
+        const statusIndicator = document.querySelector('#audio-status .status-indicator');
+        const statusText = document.querySelector('#audio-status .status-text');
+        
+        if (statusIndicator) statusIndicator.textContent = indicator;
+        if (statusText) statusText.textContent = text;
+    }
+
+    downloadAudio() {
+        if (this.currentAudio && this.currentAudio.url) {
+            const link = document.createElement('a');
+            link.href = this.currentAudio.url;
+            link.download = this.currentAudio.filename || 'audio-clip.m4a';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            this.showToast('Audio download started', 'success');
+        }
+    }
+
+    copyAudioLink() {
+        if (this.currentAudio && this.currentAudio.url) {
+            const fullUrl = window.location.origin + this.currentAudio.url;
+            navigator.clipboard.writeText(fullUrl).then(() => {
+                this.showToast('Audio link copied to clipboard', 'success');
+            }).catch(() => {
+                this.showToast('Failed to copy link', 'error');
+            });
+        }
+    }
+
+    regenerateAudio() {
+        this.generateAudioClip();
+    }
+
+    async loadAudioHistory() {
+        // This would load recent audio files from the server
+        console.log('🔄 Loading audio history...');
+        // Implementation would be similar to video history
+    }
+
+    async cleanupAudioFiles() {
+        try {
+            console.log('🧹 Cleaning up audio files...');
+            this.showToast('Audio cleanup functionality would be implemented here', 'info');
+        } catch (error) {
+            console.error('❌ Audio cleanup error:', error);
+            this.showToast('Audio cleanup failed: ' + error.message, 'error');
+        }
+    }
+
+    formatDuration(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // ============================================================================
+    // IMAGE GENERATION
+    // ============================================================================
+
+    initializeImageGeneration() {
+        console.log('🖼️ Initializing image generation...');
+        
+        // Setup image generation event listeners
+        const quickImageBtn = document.getElementById('generate-quick-image');
+        const customImageBtn = document.getElementById('generate-custom-image');
+        const refreshHistoryBtn = document.getElementById('refresh-image-history');
+        const cleanupBtn = document.getElementById('cleanup-image-files');
+
+        if (quickImageBtn) {
+            quickImageBtn.addEventListener('click', () => this.generateQuickImage());
+        }
+
+        if (customImageBtn) {
+            customImageBtn.addEventListener('click', () => this.generateCustomImage());
+        }
+
+        if (refreshHistoryBtn) {
+            refreshHistoryBtn.addEventListener('click', () => this.loadImageHistory());
+        }
+
+        if (cleanupBtn) {
+            cleanupBtn.addEventListener('click', () => this.cleanupImageFiles());
+        }
+
+        // Load image history on initialization
+        this.loadImageHistory();
+    }
+
+    async generateQuickImage() {
+        console.log('⚡ Generating quick image...');
+        
+        const button = document.getElementById('generate-quick-image');
+        const textElement = button.querySelector('.generate-text');
+        const loadingElement = button.querySelector('.generate-loading');
+        
+        this.setImageGenerationLoading(true, button, textElement, loadingElement);
+        
+        try {
+            const response = await fetch('/api/image/quick', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                console.log('✅ Quick image generated successfully:', data.image);
+                this.displayImageResult(data.image, 'quick', data.metadata);
+                this.showToast('✅ Quick image generated successfully!', 'success');
+            } else {
+                console.error('❌ Quick image generation failed:', data.error);
+                this.showToast(`❌ Image generation failed: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('❌ Quick image generation error:', error);
+            this.showToast('❌ Failed to generate image', 'error');
+        } finally {
+            this.setImageGenerationLoading(false, button, textElement, loadingElement);
+        }
+    }
+
+    async generateCustomImage() {
+        console.log('🎨 Generating custom image...');
+        
+        const prompt = document.getElementById('image-prompt').value.trim();
+        const style = document.getElementById('image-style').value;
+        const size = document.getElementById('image-size').value;
+        const quality = document.getElementById('image-quality').value;
+        
+        if (!prompt) {
+            this.showToast('❌ Please enter an image prompt', 'error');
+            return;
+        }
+        
+        const button = document.getElementById('generate-custom-image');
+        const textElement = button.querySelector('.generate-text');
+        const loadingElement = button.querySelector('.generate-loading');
+        
+        this.setImageGenerationLoading(true, button, textElement, loadingElement);
+        
+        try {
+            const response = await fetch('/api/image/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt,
+                    style,
+                    size,
+                    quality
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                console.log('✅ Custom image generated successfully:', data.image);
+                this.displayImageResult(data.image, 'custom', data.metadata);
+                this.showToast('✅ Custom image generated successfully!', 'success');
+            } else {
+                console.error('❌ Custom image generation failed:', data.error);
+                this.showToast(`❌ Image generation failed: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('❌ Custom image generation error:', error);
+            this.showToast('❌ Failed to generate image', 'error');
+        } finally {
+            this.setImageGenerationLoading(false, button, textElement, loadingElement);
+        }
+    }
+
+    displayImageResult(image, workflow, metadata) {
+        console.log('🖼️ Displaying image result:', image);
+        
+        const resultsContainer = document.getElementById('image-results');
+        const imageElement = document.getElementById('generated-image');
+        const promptElement = document.getElementById('result-image-prompt');
+        const sizeElement = document.getElementById('result-image-size');
+        const styleElement = document.getElementById('result-image-style');
+        
+        // Update image display
+        imageElement.src = image.imageUrl;
+        imageElement.alt = `Generated image: ${image.prompt}`;
+        
+        // Update metadata
+        promptElement.textContent = image.prompt;
+        sizeElement.textContent = image.dimensions;
+        styleElement.textContent = metadata.style;
+        
+        // Update detailed metadata
+        document.getElementById('meta-image-dimensions').textContent = image.dimensions;
+        document.getElementById('meta-image-size').textContent = image.fileSize;
+        document.getElementById('meta-image-style').textContent = metadata.style;
+        document.getElementById('meta-image-url').textContent = image.imageUrl;
+        
+        // Show results
+        resultsContainer.style.display = 'block';
+        
+        // Setup action buttons
+        this.setupImageActionButtons(image);
+    }
+
+    setupImageActionButtons(image) {
+        // Download button
+        const downloadBtn = document.getElementById('download-image');
+        downloadBtn.onclick = () => this.downloadImage(image);
+        
+        // Share button
+        const shareBtn = document.getElementById('share-image');
+        shareBtn.onclick = () => this.copyImageLink(image);
+        
+        // Use in video button
+        const useInVideoBtn = document.getElementById('use-in-video');
+        useInVideoBtn.onclick = () => this.useImageInVideo(image);
+        
+        // Use in tweet button
+        const useInTweetBtn = document.getElementById('use-in-tweet');
+        useInTweetBtn.onclick = () => this.useImageInTweet(image);
+    }
+
+    downloadImage(image) {
+        const link = document.createElement('a');
+        link.href = image.imageUrl;
+        link.download = image.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showToast('✅ Image download started', 'success');
+    }
+
+    copyImageLink(image) {
+        const fullUrl = `${window.location.origin}${image.imageUrl}`;
+        navigator.clipboard.writeText(fullUrl).then(() => {
+            this.showToast('✅ Image link copied to clipboard', 'success');
+        }).catch(() => {
+            this.showToast('❌ Failed to copy link', 'error');
+        });
+    }
+
+    useImageInVideo(image) {
+        // Switch to video tab and pre-fill with image context
+        this.showTab('video');
+        this.showToast('🎬 Switched to video generation. Image will be used as background.', 'info');
+        
+        // Store image context for video generation
+        window.imageContextForVideo = {
+            backgroundImage: image.imagePath,
+            backgroundUrl: image.imageUrl,
+            prompt: image.prompt
+        };
+    }
+
+    useImageInTweet(image) {
+        // Switch to queue tab and pre-fill with image
+        this.showTab('queue');
+        this.showToast('📝 Switched to tweet composition. Image will be added to media.', 'info');
+        
+        // Add image to media uploads
+        const mediaFile = {
+            id: `img_${Date.now()}`,
+            name: image.fileName,
+            type: 'image/png',
+            size: 0, // Will be updated when actually uploaded
+            url: image.imageUrl,
+            isGenerated: true
+        };
+        
+        this.addMediaFile(mediaFile);
+    }
+
+    setImageGenerationLoading(loading, button, textElement, loadingElement) {
+        if (loading) {
+            button.disabled = true;
+            textElement.style.display = 'none';
+            loadingElement.style.display = 'inline';
+        } else {
+            button.disabled = false;
+            textElement.style.display = 'inline';
+            loadingElement.style.display = 'none';
+        }
+    }
+
+    async loadImageHistory() {
+        console.log('📚 Loading image history...');
+        
+        try {
+            const response = await fetch('/api/image/history');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayImageHistory(data.images);
+            } else {
+                console.error('Failed to load image history:', data.error);
+            }
+        } catch (error) {
+            console.error('Error loading image history:', error);
+        }
+    }
+
+    displayImageHistory(images) {
+        const historyContainer = document.getElementById('image-history');
+        
+        if (images.length === 0) {
+            historyContainer.innerHTML = `
+                <div class="history-empty">
+                    <p>No images generated yet. Create your first image above!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const historyHTML = images.map(image => `
+            <div class="history-item">
+                <div class="history-image">
+                    <img src="${image.fileUrl}" alt="Generated image" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;">
+                </div>
+                <div class="history-details">
+                    <div class="history-name">${image.fileName}</div>
+                    <div class="history-meta">${image.fileSize} • ${new Date(image.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div class="history-actions">
+                    <button onclick="dashboard.downloadImage({imageUrl: '${image.fileUrl}', fileName: '${image.fileName}'})" class="btn btn-small">💾</button>
+                    <button onclick="dashboard.copyImageLink({imageUrl: '${image.fileUrl}'})" class="btn btn-small">🔗</button>
+                </div>
+            </div>
+        `).join('');
+        
+        historyContainer.innerHTML = historyHTML;
+    }
+
+    async cleanupImageFiles() {
+        console.log('🧹 Cleaning up image files...');
+        
+        try {
+            const response = await fetch('/api/image/cleanup', {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showToast(`✅ Cleaned up ${data.cleanedCount} old image files`, 'success');
+                this.loadImageHistory(); // Refresh history
+            } else {
+                this.showToast(`❌ Cleanup failed: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error cleaning up image files:', error);
+            this.showToast('❌ Failed to cleanup image files', 'error');
         }
     }
 }

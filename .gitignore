@@ -15,6 +15,22 @@ yarn-error.log*
 data/
 data/*.json
 
+# Generated content and outputs
+content/audio/
+outputs/
+temp-uploads/
+*.mp4
+*.m4a
+*.mp3
+*.wav
+*.avi
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
 # Logs
 logs
 *.log

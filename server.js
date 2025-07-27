@@ -229,6 +229,11 @@ function extractMediaFiles(req) {
 
 // Express Middleware Configuration
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/data', express.static(path.join(__dirname, 'data'))); // Serve data directory
+app.use('/content', express.static(path.join(__dirname, 'content'))); // Serve content directory
+app.use('/temp-uploads', express.static(path.join(__dirname, 'temp-uploads'))); // Serve temp uploads
+app.use('/outputs/videos', express.static(path.join(__dirname, 'outputs', 'videos'))); // Serve permanent videos
+app.use('/outputs/images', express.static(path.join(__dirname, 'outputs', 'images'))); // Serve generated images
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -1753,32 +1758,60 @@ app.post('/api/video/cleanup', async (req, res) => {
   }
 });
 
-// Quick video generation with defaults
+// Quick video generation with defaults  
 app.post('/api/video/quick', async (req, res) => {
   try {
     console.log('🚀 Quick video generation requested');
     
-    // Generate a simple video with default settings
-    const quickPrompt = "Create a hello world video with sample artist and electronic music";
+    const artist = req.body.artist || 'ACIDMAN';
+    const duration = req.body.duration || 30;
+    
+    console.log(`🎯 Generating ${duration}s video for: ${artist}`);
+    
+    // Use ArweaveVideoGenerator through multi-agent system
+    const quickPrompt = `Create a ${duration}-second video for ${artist} with professional visuals and real Arweave audio`;
     
     const result = await multiAgentOrchestrator.processRequest(quickPrompt, {
-      videoGeneration: true,
-      artist: 'random',
-      duration: 30,
+      source: 'video_api',
+      priority: 'high',
+      artist: artist,
+      duration: duration,
       style: 'classic',
-      quick: true,
-      timestamp: new Date().toISOString()
+      quick: true
     });
     
     console.log('✅ Quick video generation completed');
 
-    res.json({
-      success: true,
-      video: result.results?.[0]?.result || null,
-      workflow: result.workflow,
-      message: 'Quick video generated successfully',
-      metadata: result.metadata || {}
-    });
+    // Find video generation result in the results array
+    const videoResult = Object.values(result.results).find(r => r.type === 'video_generation');
+    
+    if (videoResult?.success) {
+      const video = videoResult.video;
+      
+      res.json({
+        success: true,
+        video: {
+          filename: video.filename,
+          url: video.url,
+          path: video.path,
+          duration: video.duration,
+          artist: video.artist,
+          mixTitle: video.mixTitle,
+          fileSize: video.fileSize,
+          created: new Date().toISOString(),
+          mock: video.mock || false
+        },
+        workflow: 'arweave_video_generation',
+        message: 'Quick video generated successfully with real Arweave audio',
+        metadata: {
+          generator: 'ArweaveVideoGenerator',
+          audioUrl: video.metadata?.arweaveUrl,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } else {
+      throw new Error(videoResult?.error || 'Video generation failed');
+    }
 
   } catch (error) {
     console.error('❌ Quick video generation error:', error);
@@ -1786,6 +1819,642 @@ app.post('/api/video/quick', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Quick video generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Custom video generation with full parameters
+app.post('/api/video/custom', async (req, res) => {
+  try {
+    const { prompt, artist, duration, style } = req.body;
+    
+    console.log(`🎬 Custom video generation requested:`, { prompt, artist, duration, style });
+    
+    // Use ArweaveVideoGenerator through multi-agent system
+    const customPrompt = `${prompt} - Create a ${duration}-second video for ${artist} in ${style} style with professional visuals`;
+    
+    const result = await multiAgentOrchestrator.processRequest(customPrompt, {
+      source: 'video_api',
+      priority: 'high',
+      artist: artist,
+      duration: duration,
+      style: style,
+      prompt: prompt
+    });
+
+    console.log('✅ Custom video generation completed');
+
+    // Find video generation result in the results array
+    const videoResult = Object.values(result.results).find(r => r.type === 'video_generation');
+    
+    res.json({
+      success: true,
+      video: videoResult?.video || null,
+      workflow: result.workflow,
+      message: 'Custom video generated successfully',
+      metadata: result.metadata || {}
+    });
+
+  } catch (error) {
+    console.error('❌ Custom video generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Custom video generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Generate Arweave audio clip 
+app.post('/api/audio/generate', async (req, res) => {
+  try {
+    const { artist, duration = 30, prompt } = req.body;
+    
+    console.log(`🎵 Audio generation requested: ${duration}s${artist ? ` for ${artist}` : ' (random)'}`);
+    
+    const audioPrompt = prompt || `Generate ${duration}-second audio clip${artist ? ` for ${artist}` : ''}`;
+    
+    const result = await multiAgentOrchestrator.processRequest(audioPrompt, {
+      source: 'audio_api',
+      priority: 'high',
+      artist: artist,
+      duration: duration
+    });
+
+    // Find audio generation result in the results array
+    const audioResult = Object.values(result.results).find(r => r.type === 'audio_generation');
+    
+    if (audioResult?.success) {
+      res.json({
+        success: true,
+        audio: {
+          filename: audioResult.fileName,
+          url: audioResult.url,
+          path: audioResult.audioPath,
+          duration: audioResult.duration,
+          artist: audioResult.artist,
+          mixTitle: audioResult.mixTitle,
+          fileSize: audioResult.fileSize,
+          created: new Date().toISOString()
+        },
+        workflow: result.workflow,
+        message: audioResult.message,
+        metadata: audioResult.metadata
+      });
+    } else {
+      throw new Error(audioResult?.error || 'Audio generation failed');
+    }
+
+  } catch (error) {
+    console.error('❌ Audio generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Audio generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Test Arweave connection for artist
+app.post('/api/audio/test-connection', async (req, res) => {
+  try {
+    const { artist } = req.body;
+    
+    if (!artist) {
+      return res.status(400).json({
+        success: false,
+        error: 'Artist name required'
+      });
+    }
+
+    const { ArweaveAudioAgent } = require('./src/agents/ArweaveAudioAgent.js');
+    const audioAgent = new ArweaveAudioAgent();
+    
+    const testResult = await audioAgent.testArtistConnection(artist);
+    
+    res.json({
+      success: testResult.success,
+      result: testResult,
+      message: testResult.success ? 
+        `Connection test successful for ${testResult.artist}` : 
+        `Connection test failed: ${testResult.error}`
+    });
+
+  } catch (error) {
+    console.error('❌ Connection test error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Connection test failed',
+      details: error.message
+    });
+  }
+});
+
+// Get audio metadata without generating files
+app.post('/api/audio/metadata', async (req, res) => {
+  try {
+    const { artist } = req.body;
+    
+    console.log('🎵 Audio metadata requested for:', artist || 'random artist');
+
+    const prompt = `Get audio metadata${artist ? ` for ${artist}` : ' for random artist'}`;
+    const context = {
+      artist,
+      metadataOnly: true
+    };
+
+    // Use multi-agent orchestrator
+    const result = await multiAgentOrchestrator.processRequest(prompt, context);
+    
+    // Find metadata result in the results array
+    const metadataResult = Object.values(result.results).find(r => 
+      r.type === 'artist_metadata' || r.type === 'audio_generation'
+    );
+    
+    if (metadataResult?.success) {
+      res.json({
+        success: true,
+        data: metadataResult,
+        workflow: result.workflow,
+        message: 'Metadata retrieved successfully'
+      });
+    } else {
+      throw new Error(metadataResult?.error || 'Metadata retrieval failed');
+    }
+
+  } catch (error) {
+    console.error('❌ Audio metadata error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Metadata retrieval failed',
+      details: error.message
+    });
+  }
+});
+
+// Get all artists metadata
+app.get('/api/audio/artists', async (req, res) => {
+  try {
+    console.log('🎵 All artists metadata requested');
+
+    // Direct call to audio agent
+    const { ArweaveAudioAgent } = require('./src/agents/ArweaveAudioAgent.js');
+    const audioAgent = new ArweaveAudioAgent();
+    
+    const result = await audioAgent.getAllArtistsMetadata();
+    
+    if (result && result.success) {
+      res.json({
+        success: true,
+        data: result,
+        message: `Retrieved metadata for ${result.totalArtists} artists`
+      });
+    } else {
+      throw new Error(result?.error || 'Artists metadata retrieval failed');
+    }
+
+  } catch (error) {
+    console.error('❌ Artists metadata error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Artists metadata retrieval failed',
+      details: error.message
+    });
+  }
+});
+
+// Test simple video generation directly
+app.post('/api/video/test-simple', async (req, res) => {
+  try {
+    const artist = req.body.artist || 'ACIDMAN';
+    const duration = req.body.duration || 15;
+    
+    console.log(`🧪 Testing simple video generation for ${artist} (${duration}s)`);
+    
+    const { SimpleVideoGenerator } = require('./src/lib/SimpleVideoGenerator.js');
+    const generator = new SimpleVideoGenerator();
+    
+    const result = await generator.generateSimpleVideo({
+      name: artist,
+      genre: 'electronic',
+      mixCount: 3
+    }, {
+      duration: duration,
+      width: 720,
+      height: 720
+    });
+    
+    console.log('✅ Simple video test completed');
+    
+    res.json({
+      success: true,
+      result: result,
+      message: 'Simple video generation test completed'
+    });
+    
+  } catch (error) {
+    console.error('❌ Simple video test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Simple video test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test full video generation pipeline
+app.post('/api/video/test-full-pipeline', async (req, res) => {
+  try {
+    console.log('🧪 Testing full video generation pipeline...');
+    
+    const { ArweaveVideoAgent } = require('./src/agents/ArweaveVideoAgent.js');
+    const videoAgent = new ArweaveVideoAgent();
+    
+    // Test each component individually
+    const testResults = {
+      audioProcessor: { status: 'pending' },
+      htmlRenderer: { status: 'pending' },
+      videoCompositor: { status: 'pending' },
+      aiBackgroundGenerator: { status: 'pending' },
+      fullPipeline: { status: 'pending' }
+    };
+
+    // Test audio processor
+    try {
+      const audioStats = videoAgent.audioProcessor.getStats();
+      testResults.audioProcessor = {
+        status: 'success',
+        data: audioStats
+      };
+      console.log('✅ Audio processor test passed');
+    } catch (error) {
+      testResults.audioProcessor = {
+        status: 'error',
+        error: error.message
+      };
+      console.log('❌ Audio processor test failed:', error.message);
+    }
+
+    // Test HTML renderer
+    try {
+      const htmlStats = videoAgent.htmlRenderer.getStats();
+      testResults.htmlRenderer = {
+        status: 'success',
+        data: htmlStats
+      };
+      console.log('✅ HTML renderer test passed');
+    } catch (error) {
+      testResults.htmlRenderer = {
+        status: 'error',
+        error: error.message
+      };
+      console.log('❌ HTML renderer test failed:', error.message);
+    }
+
+    // Test video compositor
+    try {
+      const videoStats = videoAgent.videoCompositor.getStats();
+      testResults.videoCompositor = {
+        status: 'success',
+        data: videoStats
+      };
+      console.log('✅ Video compositor test passed');
+    } catch (error) {
+      testResults.videoCompositor = {
+        status: 'error',
+        error: error.message
+      };
+      console.log('❌ Video compositor test failed:', error.message);
+    }
+
+    // Test AI background generator
+    try {
+      const aiStats = videoAgent.aiBackgroundGenerator.getStats();
+      const aiConnection = await videoAgent.aiBackgroundGenerator.testConnection();
+      testResults.aiBackgroundGenerator = {
+        status: 'success',
+        data: aiStats,
+        connection: aiConnection
+      };
+      console.log('✅ AI background generator test passed');
+    } catch (error) {
+      testResults.aiBackgroundGenerator = {
+        status: 'error',
+        error: error.message
+      };
+      console.log('❌ AI background generator test failed:', error.message);
+    }
+
+    // Test full pipeline with simple video
+    try {
+      const simpleVideoPrompt = "Generate a test video for DJ CodeBeat";
+      const fullResult = await videoAgent.handleMessage(simpleVideoPrompt, {
+        artist: 'DJ CodeBeat',
+        duration: 15, // Shorter for testing
+        style: 'classic'
+      });
+
+      testResults.fullPipeline = {
+        status: fullResult.success ? 'success' : 'partial',
+        data: fullResult,
+        video: fullResult.result
+      };
+      console.log('✅ Full pipeline test completed');
+    } catch (error) {
+      testResults.fullPipeline = {
+        status: 'error',
+        error: error.message
+      };
+      console.log('❌ Full pipeline test failed:', error.message);
+    }
+
+    // Clean up resources
+    await videoAgent.closeResources();
+
+    const overallSuccess = Object.values(testResults).every(test => 
+      test.status === 'success' || test.status === 'partial'
+    );
+
+    res.json({
+      success: overallSuccess,
+      message: overallSuccess 
+        ? 'Full video generation pipeline test completed successfully'
+        : 'Some components failed testing',
+      results: testResults,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Pipeline test error:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Pipeline test failed',
+      details: error.message
+    });
+  }
+});
+
+// Get available artists for video generation
+app.get('/api/video/artists', async (req, res) => {
+  try {
+    const artistsPath = path.join(__dirname, 'data', 'sample-artists.json');
+    const artists = JSON.parse(fs.readFileSync(artistsPath, 'utf8'));
+
+    // Format artist data for frontend
+    const formattedArtists = artists.map(artist => ({
+      name: artist.artistName,
+      genre: artist.artistGenre,
+      mixCount: artist.mixes.length,
+      filename: artist.artistFilename,
+      imageFilename: artist.artistImageFilename,
+      mixes: artist.mixes.map(mix => ({
+        title: mix.mixTitle,
+        duration: mix.mixDuration,
+        year: mix.mixDateYear,
+        arweaveURL: mix.mixArweaveURL
+      }))
+    }));
+
+    res.json({
+      success: true,
+      artists: formattedArtists,
+      count: formattedArtists.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Failed to load artists:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load artist data',
+      details: error.message
+    });
+  }
+});
+
+// Test individual video components
+app.get('/api/video/test-components', async (req, res) => {
+  try {
+    const tests = {};
+
+    // Test FFmpeg availability
+    try {
+      const ffmpeg = require('fluent-ffmpeg');
+      const ffmpegPath = require('ffmpeg-static');
+      ffmpeg.setFfmpegPath(ffmpegPath);
+      
+      tests.ffmpeg = {
+        status: 'available',
+        path: ffmpegPath
+      };
+    } catch (error) {
+      tests.ffmpeg = {
+        status: 'error',
+        error: error.message
+      };
+    }
+
+    // Test Puppeteer
+    try {
+      const puppeteer = require('puppeteer');
+      tests.puppeteer = {
+        status: 'available',
+        version: puppeteer._preferredRevision || 'unknown'
+      };
+    } catch (error) {
+      tests.puppeteer = {
+        status: 'error',
+        error: error.message
+      };
+    }
+
+    // Test Sharp
+    try {
+      const sharp = require('sharp');
+      tests.sharp = {
+        status: 'available',
+        version: sharp.versions
+      };
+    } catch (error) {
+      tests.sharp = {
+        status: 'error',
+        error: error.message
+      };
+    }
+
+    // Test OpenAI
+    tests.openai = {
+      status: process.env.OPENAI_API_KEY ? 'configured' : 'missing',
+      keyPresent: !!process.env.OPENAI_API_KEY
+    };
+
+    res.json({
+      success: true,
+      components: tests,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Component test failed',
+      details: error.message
+    });
+  }
+});
+
+// Image Generation Endpoints
+app.post('/api/image/generate', async (req, res) => {
+  try {
+    console.log('🖼️ Image generation request received:', req.body);
+    
+    const { prompt, style, size, quality } = req.body;
+    
+    // Validate required parameters
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Image prompt is required'
+      });
+    }
+
+    // Initialize image generation agent
+    const { ImageGenerationAgent } = require('./src/agents/ImageGenerationAgent.js');
+    const imageAgent = new ImageGenerationAgent();
+    
+    // Prepare context with parameters
+    const context = {
+      imagePrompt: prompt,
+      imageStyle: style || 'realistic',
+      imageSize: size || '720x720',
+      imageQuality: quality || 'standard'
+    };
+    
+    // Generate image
+    const result = await imageAgent.handleMessage(prompt, context);
+    
+    if (result.success) {
+      console.log('✅ Image generated successfully:', result.image.fileName);
+      
+      res.json({
+        success: true,
+        image: result.image,
+        message: result.message,
+        metadata: result.metadata
+      });
+    } else {
+      console.error('❌ Image generation failed:', result.error);
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        message: result.message
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Image generation endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Image generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Quick image generation endpoint
+app.post('/api/image/quick', async (req, res) => {
+  try {
+    console.log('⚡ Quick image generation request received');
+    
+    // Initialize image generation agent
+    const { ImageGenerationAgent } = require('./src/agents/ImageGenerationAgent.js');
+    const imageAgent = new ImageGenerationAgent();
+    
+    // Generate Chicago skyline image
+    const result = await imageAgent.handleMessage('Generate a Chicago skyline image', {
+      imagePrompt: 'A stunning Chicago skyline at sunset with modern skyscrapers',
+      imageStyle: 'realistic',
+      imageSize: '720x720',
+      imageQuality: 'standard'
+    });
+    
+    if (result.success) {
+      console.log('✅ Quick image generated successfully:', result.image.fileName);
+      
+      res.json({
+        success: true,
+        image: result.image,
+        message: result.message,
+        metadata: result.metadata
+      });
+    } else {
+      console.error('❌ Quick image generation failed:', result.error);
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        message: result.message
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Quick image generation endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Quick image generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Get image history
+app.get('/api/image/history', async (req, res) => {
+  try {
+    console.log('📚 Image history request received');
+    
+    const { ImageGenerator } = require('./src/lib/ImageGenerator.js');
+    const imageGenerator = new ImageGenerator();
+    
+    const history = await imageGenerator.getImageHistory();
+    
+    res.json({
+      success: true,
+      images: history,
+      count: history.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Image history endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get image history',
+      details: error.message
+    });
+  }
+});
+
+// Cleanup image files
+app.post('/api/image/cleanup', async (req, res) => {
+  try {
+    console.log('🧹 Image cleanup request received');
+    
+    const { ImageGenerator } = require('./src/lib/ImageGenerator.js');
+    const imageGenerator = new ImageGenerator();
+    
+    const cleanedCount = await imageGenerator.cleanupOldImages();
+    
+    res.json({
+      success: true,
+      cleanedCount,
+      message: `Cleaned up ${cleanedCount} old image files`
+    });
+    
+  } catch (error) {
+    console.error('❌ Image cleanup endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cleanup image files',
       details: error.message
     });
   }
