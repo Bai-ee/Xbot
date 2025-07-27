@@ -1,4 +1,4 @@
-// Creative Tech DJ Twitter Bot Dashboard
+// Creative Tech DJ Twitter Bot Dashboard with Multi-Agent Framework
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -7,6 +7,11 @@ const path = require('path');
 const multer = require('multer');
 const { TwitterApi } = require('twitter-api-v2');
 const OpenAI = require('openai');
+
+// Multi-Agent Framework Integration
+const { environmentConfig } = require('./src/config/environment.js');
+const { multiAgentOrchestrator } = require('./src/agents/MultiAgentOrchestrator.js');
+const { twitterAgentFactory } = require('./src/agents/TwitterContentAgents.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1410,9 +1415,224 @@ Be helpful, creative, and focused on practical Twitter/music industry advice. Ke
   }
 });
 
+// ============================================================================
+// MULTI-AGENT FRAMEWORK API ENDPOINTS
+// ============================================================================
+
+// Main multi-agent processing endpoint
+app.post('/api/multi-agent', async (req, res) => {
+  const { input, context = {}, workflow = 'auto' } = req.body;
+  
+  if (!input || input.trim().length === 0) {
+    return res.status(400).json({ error: 'Input message is required' });
+  }
+
+  // Check if OpenAI is available for multi-agent processing
+  if (!openaiAvailable || !openai) {
+    return res.status(503).json({ 
+      error: 'Multi-agent system is currently unavailable', 
+      details: 'OpenAI API key not configured or invalid. Please check your OPENAI_API_KEY environment variable.' 
+    });
+  }
+
+  try {
+    console.log('🚀 Multi-agent request:', input.substring(0, 100) + '...');
+    
+    // Enhance context with current dashboard data
+    const enhancedContext = {
+      ...context,
+      profile: analyticsCache.profile || {},
+      analytics: analyticsCache.analytics || {},
+      recentTweets: analyticsCache.recentTweets || [],
+      timestamp: new Date().toISOString()
+    };
+
+    // Process request through multi-agent orchestrator
+    const result = await multiAgentOrchestrator.processRequest(input, enhancedContext);
+    
+    console.log('✅ Multi-agent processing completed:', {
+      workflow: result.workflow,
+      agents: result.agents?.length || 0,
+      success: result.success
+    });
+
+    res.json({
+      success: true,
+      workflow: result.workflow,
+      results: result.results,
+      agents: result.agents || [],
+      finalOutput: result.finalOutput || null,
+      metadata: result.metadata || {}
+    });
+
+  } catch (error) {
+    console.error('❌ Multi-agent processing error:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Multi-agent processing failed',
+      details: error.message
+    });
+  }
+});
+
+// Get agent system status
+app.get('/api/agents/status', async (req, res) => {
+  try {
+    const systemStatus = multiAgentOrchestrator.getSystemStatus();
+    const healthCheck = await twitterAgentFactory.healthCheckAll();
+    
+    res.json({
+      success: true,
+      system: systemStatus,
+      health: healthCheck,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Agent status check failed:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get agent status',
+      details: error.message
+    });
+  }
+});
+
+// Get available agent capabilities
+app.get('/api/agents/capabilities', (req, res) => {
+  try {
+    const capabilities = multiAgentOrchestrator.getAvailableCapabilities();
+    const agentTypes = twitterAgentFactory.getAvailableAgentTypes();
+    
+    res.json({
+      success: true,
+      capabilities,
+      availableAgents: agentTypes,
+      totalAgents: agentTypes.length
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to get agent capabilities:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get agent capabilities',
+      details: error.message
+    });
+  }
+});
+
+// Execute specific workflow
+app.post('/api/workflow/:type', async (req, res) => {
+  const workflowType = req.params.type;
+  const { input, context = {} } = req.body;
+  
+  if (!input || input.trim().length === 0) {
+    return res.status(400).json({ error: 'Input message is required' });
+  }
+
+  // Check if OpenAI is available
+  if (!openaiAvailable || !openai) {
+    return res.status(503).json({ 
+      error: 'Workflow system is currently unavailable', 
+      details: 'OpenAI API key not configured or invalid.' 
+    });
+  }
+
+  try {
+    console.log(`🔄 Executing ${workflowType} workflow:`, input.substring(0, 100) + '...');
+    
+    // Force specific workflow by modifying analysis
+    const enhancedContext = {
+      ...context,
+      profile: analyticsCache.profile || {},
+      analytics: analyticsCache.analytics || {},
+      recentTweets: analyticsCache.recentTweets || [],
+      forceWorkflow: workflowType,
+      timestamp: new Date().toISOString()
+    };
+
+    // Map workflow types to agent combinations
+    const workflowAgents = {
+      'content': ['content_creator'],
+      'hashtag': ['hashtag_specialist'], 
+      'engagement': ['engagement_optimizer'],
+      'trend': ['trend_analyst'],
+      'schedule': ['scheduler'],
+      'comprehensive': ['content_creator', 'hashtag_specialist', 'engagement_optimizer', 'scheduler'],
+      'creative': ['trend_analyst', 'content_creator', 'hashtag_specialist']
+    };
+
+    const agents = workflowAgents[workflowType] || ['content_creator'];
+    
+    // Simulate analysis result to force specific workflow
+    const mockAnalysis = {
+      complexity: agents.length + 1,
+      requiresMultiAgent: agents.length > 1,
+      suggestedAgents: agents,
+      workflow: agents.length > 1 ? 'comprehensive' : 'simple'
+    };
+
+    let result;
+    if (agents.length === 1) {
+      result = await multiAgentOrchestrator.handleSimpleTask(input, enhancedContext, mockAnalysis);
+    } else {
+      result = await multiAgentOrchestrator.handleComplexWorkflow(input, enhancedContext, mockAnalysis);
+    }
+    
+    console.log(`✅ ${workflowType} workflow completed:`, result.workflow);
+
+    res.json({
+      success: true,
+      workflowType,
+      workflow: result.workflow,
+      results: result.results,
+      agents: result.agents || [],
+      finalOutput: result.finalOutput || null,
+      metadata: result.metadata || {}
+    });
+
+  } catch (error) {
+    console.error(`❌ ${workflowType} workflow error:`, error);
+    
+    res.status(500).json({
+      success: false,
+      error: `${workflowType} workflow failed`,
+      details: error.message
+    });
+  }
+});
+
+// Initialize Multi-Agent Framework
+async function initializeMultiAgentFramework() {
+  try {
+    console.log('🤖 Initializing Multi-Agent Framework...');
+    
+    // Initialize environment configuration
+    await environmentConfig.initializeValidation();
+    
+    // Check agent factory status
+    const agentStatus = twitterAgentFactory.getSystemStats();
+    console.log('🎯 Agent Factory Status:', agentStatus);
+    
+    // Check orchestrator status
+    const orchestratorStatus = multiAgentOrchestrator.getSystemStatus();
+    console.log('🚀 Multi-Agent Orchestrator Status:', orchestratorStatus.orchestrator.status);
+    
+    console.log('✅ Multi-Agent Framework initialized successfully!');
+  } catch (error) {
+    console.error('❌ Multi-Agent Framework initialization failed:', error.message);
+  }
+}
+
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🎵 DJ Twitter Bot Dashboard running on port ${PORT}`);
   console.log(`🌐 Open http://localhost:${PORT} to access the dashboard`);
   console.log(`🤖 Bot is ready for tweet approval and monitoring!`);
+  
+  // Initialize multi-agent framework after server starts
+  await initializeMultiAgentFramework();
 }); 

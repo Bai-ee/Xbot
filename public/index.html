@@ -18,6 +18,7 @@
             <button class="tab-btn active" data-tab="queue">📝 Queue</button>
             <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
             <button class="tab-btn" data-tab="chat">🤖 AI Assistant</button>
+            <button class="tab-btn" data-tab="multi-agent">🚀 Multi-Agent</button>
         </div>
 
         <!-- Queue Tab -->
@@ -206,6 +207,139 @@
                             <span class="send-text">Send</span>
                             <span class="send-loading" style="display: none;">Thinking...</span>
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Agent Tab -->
+        <div class="tab-content" id="multi-agent-tab" style="display: none;">
+            <div class="multi-agent-interface">
+                <div class="multi-agent-header">
+                    <h3>🚀 Multi-Agent Content Creation</h3>
+                    <p>Leverage specialized AI agents to create comprehensive Twitter content strategies</p>
+                </div>
+
+                <!-- Agent Status Panel -->
+                <div class="agent-status-panel">
+                    <h4>📊 Agent System Status</h4>
+                    <div class="agent-stats" id="agent-stats">
+                        <div class="agent-stat">
+                            <span class="stat-label">Active Agents:</span>
+                            <span class="stat-value" id="active-agents">0</span>
+                        </div>
+                        <div class="agent-stat">
+                            <span class="stat-label">System Health:</span>
+                            <span class="stat-value status-operational" id="system-health">Loading...</span>
+                        </div>
+                        <div class="agent-stat">
+                            <span class="stat-label">Workflows Completed:</span>
+                            <span class="stat-value" id="workflows-completed">0</span>
+                        </div>
+                    </div>
+                    <button id="refresh-agent-status" class="btn btn-secondary btn-small">🔄 Refresh Status</button>
+                </div>
+
+                <!-- Workflow Selection -->
+                <div class="workflow-selection">
+                    <h4>🎯 Select Workflow Type</h4>
+                    <div class="workflow-buttons">
+                        <button class="workflow-btn" data-workflow="auto">🤖 Auto (Smart Routing)</button>
+                        <button class="workflow-btn" data-workflow="comprehensive">📋 Comprehensive Strategy</button>
+                        <button class="workflow-btn" data-workflow="content">✍️ Content Creation</button>
+                        <button class="workflow-btn" data-workflow="hashtag">🏷️ Hashtag Optimization</button>
+                        <button class="workflow-btn" data-workflow="engagement">📈 Engagement Boost</button>
+                        <button class="workflow-btn" data-workflow="trend">🔥 Trend Analysis</button>
+                        <button class="workflow-btn" data-workflow="creative">💡 Creative Brainstorm</button>
+                    </div>
+                </div>
+
+                <!-- Multi-Agent Input -->
+                <div class="multi-agent-input-section">
+                    <h4>💬 Describe Your Content Goal</h4>
+                    <textarea 
+                        id="multi-agent-input" 
+                        placeholder="Examples:&#10;• Create a comprehensive strategy for promoting my upcoming DJ set&#10;• Generate trending content about music production&#10;• Optimize my tweet about new equipment for maximum engagement&#10;• Analyze current trends and create viral content ideas"
+                        rows="4"></textarea>
+                    
+                    <div class="input-controls">
+                        <button id="process-multi-agent" class="btn btn-primary">
+                            <span class="process-text">🚀 Process with Multi-Agent</span>
+                            <span class="process-loading" style="display: none;">Processing...</span>
+                        </button>
+                        <button id="clear-multi-agent" class="btn btn-secondary">🗑️ Clear</button>
+                    </div>
+                </div>
+
+                <!-- Results Display -->
+                <div class="multi-agent-results" id="multi-agent-results" style="display: none;">
+                    <div class="results-header">
+                        <h4>📊 Multi-Agent Results</h4>
+                        <div class="workflow-info">
+                            <span class="workflow-type" id="result-workflow-type"></span>
+                            <span class="agents-used" id="result-agents-used"></span>
+                        </div>
+                    </div>
+
+                    <div class="results-content">
+                        <!-- Final Output -->
+                        <div class="result-section final-output" id="final-output-section" style="display: none;">
+                            <h5>🎯 Final Strategy</h5>
+                            <div class="result-content" id="final-output-content"></div>
+                        </div>
+
+                        <!-- Individual Agent Results -->
+                        <div class="result-section agent-results">
+                            <h5>🤖 Agent Contributions</h5>
+                            <div class="agent-results-container" id="agent-results-container">
+                                <!-- Agent results will be inserted here -->
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="result-actions">
+                            <button id="use-content" class="btn btn-primary" style="display: none;">
+                                ✅ Use This Content
+                            </button>
+                            <button id="refine-results" class="btn btn-secondary">
+                                🔄 Refine Results
+                            </button>
+                            <button id="save-strategy" class="btn btn-accent">
+                                💾 Save Strategy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Available Agents Info -->
+                <div class="available-agents-info">
+                    <h4>🎭 Available Specialized Agents</h4>
+                    <div class="agents-grid">
+                        <div class="agent-card">
+                            <div class="agent-icon">✍️</div>
+                            <div class="agent-name">Content Creator</div>
+                            <div class="agent-description">Creates engaging Twitter content tailored to your audience</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">🏷️</div>
+                            <div class="agent-name">Hashtag Specialist</div>
+                            <div class="agent-description">Optimizes hashtags for maximum reach and discoverability</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">📈</div>
+                            <div class="agent-name">Engagement Optimizer</div>
+                            <div class="agent-description">Maximizes likes, retweets, and engagement potential</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">🔥</div>
+                            <div class="agent-name">Trend Analyst</div>
+                            <div class="agent-description">Analyzes current trends and suggests viral content ideas</div>
+                        </div>
+                        <div class="agent-card">
+                            <div class="agent-icon">⏰</div>
+                            <div class="agent-name">Scheduler</div>
+                            <div class="agent-description">Recommends optimal posting times and frequency</div>
+                        </div>
                     </div>
                 </div>
             </div>

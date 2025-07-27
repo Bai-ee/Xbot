@@ -109,6 +109,9 @@ class TwitterBotDashboard {
                 }
             });
         }
+
+        // Multi-Agent functionality
+        this.setupMultiAgentEventListeners();
     }
 
     showTab(tabName) {
@@ -1323,6 +1326,419 @@ class TwitterBotDashboard {
             console.warn('Error getting chat context:', error);
             return {};
         }
+    }
+
+    // ============================================================================
+    // MULTI-AGENT FRAMEWORK METHODS
+    // ============================================================================
+
+    setupMultiAgentEventListeners() {
+        // Workflow selection buttons
+        document.querySelectorAll('.workflow-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.selectWorkflow(e.target.dataset.workflow);
+            });
+        });
+
+        // Multi-agent processing
+        const processBtn = document.getElementById('process-multi-agent');
+        const clearBtn = document.getElementById('clear-multi-agent');
+        const refreshStatusBtn = document.getElementById('refresh-agent-status');
+
+        if (processBtn) {
+            processBtn.addEventListener('click', () => this.processMultiAgent());
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearMultiAgent());
+        }
+
+        if (refreshStatusBtn) {
+            refreshStatusBtn.addEventListener('click', () => this.refreshAgentStatus());
+        }
+
+        // Result action buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'use-content') {
+                this.useMultiAgentContent();
+            } else if (e.target.id === 'refine-results') {
+                this.refineMultiAgentResults();
+            } else if (e.target.id === 'save-strategy') {
+                this.saveMultiAgentStrategy();
+            }
+        });
+
+        // Load initial agent status
+        this.refreshAgentStatus();
+    }
+
+    selectWorkflow(workflowType) {
+        // Update button states
+        document.querySelectorAll('.workflow-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        const selectedBtn = document.querySelector(`[data-workflow="${workflowType}"]`);
+        if (selectedBtn) {
+            selectedBtn.classList.add('active');
+        }
+
+        this.selectedWorkflow = workflowType;
+        console.log('Selected workflow:', workflowType);
+    }
+
+    async processMultiAgent() {
+        const input = document.getElementById('multi-agent-input');
+        const processBtn = document.getElementById('process-multi-agent');
+        const processText = processBtn.querySelector('.process-text');
+        const processLoading = processBtn.querySelector('.process-loading');
+
+        if (!input.value.trim()) {
+            this.showToast('Please describe your content goal', 'warning');
+            return;
+        }
+
+        try {
+            // Update button state
+            processText.style.display = 'none';
+            processLoading.style.display = 'inline-flex';
+            processBtn.disabled = true;
+
+            console.log('🚀 Processing multi-agent request:', input.value);
+
+            // Prepare request
+            const requestData = {
+                input: input.value.trim(),
+                context: this.getChatContext(),
+                workflow: this.selectedWorkflow || 'auto'
+            };
+
+            // Choose endpoint based on workflow selection
+            const endpoint = this.selectedWorkflow && this.selectedWorkflow !== 'auto' 
+                ? `/api/workflow/${this.selectedWorkflow}`
+                : '/api/multi-agent';
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                this.displayMultiAgentResults(result);
+                this.showToast('Multi-agent processing completed!', 'success');
+            } else {
+                throw new Error(result.error || 'Multi-agent processing failed');
+            }
+
+        } catch (error) {
+            console.error('❌ Multi-agent processing error:', error);
+            this.showToast(`Processing failed: ${error.message}`, 'error');
+        } finally {
+            // Reset button state
+            processText.style.display = 'inline';
+            processLoading.style.display = 'none';
+            processBtn.disabled = false;
+        }
+    }
+
+    displayMultiAgentResults(result) {
+        const resultsContainer = document.getElementById('multi-agent-results');
+        const workflowType = document.getElementById('result-workflow-type');
+        const agentsUsed = document.getElementById('result-agents-used');
+        const finalOutputSection = document.getElementById('final-output-section');
+        const finalOutputContent = document.getElementById('final-output-content');
+        const agentResultsContainer = document.getElementById('agent-results-container');
+        const useContentBtn = document.getElementById('use-content');
+
+        // Show the results container
+        resultsContainer.style.display = 'block';
+
+        // Update workflow info
+        if (workflowType) {
+            workflowType.textContent = result.workflow || result.workflowType || 'auto';
+        }
+        
+        if (agentsUsed) {
+            const agentCount = result.agents ? result.agents.length : 0;
+            agentsUsed.textContent = `${agentCount} agent${agentCount !== 1 ? 's' : ''} used`;
+        }
+
+        // Display final output if available
+        if (result.finalOutput && result.finalOutput.strategy) {
+            finalOutputSection.style.display = 'block';
+            finalOutputContent.innerHTML = this.formatMultiAgentContent(result.finalOutput.strategy);
+            
+            // Show use content button for final output
+            if (useContentBtn) {
+                useContentBtn.style.display = 'inline-block';
+                useContentBtn.dataset.content = result.finalOutput.strategy;
+            }
+        } else {
+            finalOutputSection.style.display = 'none';
+        }
+
+        // Display individual agent results
+        agentResultsContainer.innerHTML = '';
+        
+        if (result.results && result.results.length > 0) {
+            result.results.forEach((agentResult, index) => {
+                const agentName = result.agents ? result.agents[index] : `Agent ${index + 1}`;
+                const resultElement = this.createAgentResultElement(agentName, agentResult);
+                agentResultsContainer.appendChild(resultElement);
+            });
+        }
+
+        // Store results for later use
+        this.lastMultiAgentResults = result;
+
+        // Scroll to results
+        resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    createAgentResultElement(agentName, result) {
+        const div = document.createElement('div');
+        div.className = 'agent-result';
+
+        const header = document.createElement('div');
+        header.className = 'agent-result-header';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'agent-name';
+        nameSpan.textContent = this.formatAgentName(agentName);
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'agent-type';
+        typeSpan.textContent = result.type || 'result';
+
+        header.appendChild(nameSpan);
+        header.appendChild(typeSpan);
+
+        const content = document.createElement('div');
+        content.className = 'agent-result-content';
+
+        // Format different types of agent results
+        if (result.content) {
+            content.innerHTML = this.formatMultiAgentContent(result.content);
+        } else if (result.recommendations) {
+            content.innerHTML = this.formatMultiAgentContent(result.recommendations);
+        } else if (result.analysis) {
+            content.innerHTML = this.formatMultiAgentContent(result.analysis);
+        } else if (typeof result === 'string') {
+            content.innerHTML = this.formatMultiAgentContent(result);
+        } else {
+            content.innerHTML = this.formatMultiAgentContent(JSON.stringify(result, null, 2));
+        }
+
+        div.appendChild(header);
+        div.appendChild(content);
+
+        return div;
+    }
+
+    formatAgentName(agentName) {
+        const nameMap = {
+            'content_creator': 'Content Creator',
+            'hashtag_specialist': 'Hashtag Specialist',
+            'engagement_optimizer': 'Engagement Optimizer',
+            'trend_analyst': 'Trend Analyst',
+            'scheduler': 'Scheduler',
+            'ContentCreator': 'Content Creator',
+            'HashtagSpecialist': 'Hashtag Specialist',
+            'EngagementOptimizer': 'Engagement Optimizer',
+            'TrendAnalyst': 'Trend Analyst',
+            'Scheduler': 'Scheduler'
+        };
+
+        return nameMap[agentName] || agentName;
+    }
+
+    formatMultiAgentContent(content) {
+        if (!content) return '';
+
+        // Convert string to HTML with basic formatting
+        let formatted = content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+            .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+            .replace(/^- (.*)$/gm, '<li>$1</li>') // List items
+            .replace(/`{3}([\s\S]*?)`{3}/g, '<pre><code>$1</code></pre>') // Code blocks
+            .replace(/`(.*?)`/g, '<code>$1</code>') // Inline code
+            .replace(/\n\n/g, '</p><p>') // Paragraphs
+            .replace(/\n/g, '<br>'); // Line breaks
+
+        // Wrap in paragraph tags if list items are present
+        if (formatted.includes('<li>')) {
+            formatted = formatted.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+        }
+
+        // Wrap in paragraph tags
+        if (!formatted.startsWith('<')) {
+            formatted = `<p>${formatted}</p>`;
+        }
+
+        return formatted;
+    }
+
+    async refreshAgentStatus() {
+        try {
+            const response = await fetch('/api/agents/status');
+            const statusData = await response.json();
+
+            if (response.ok && statusData.success) {
+                this.updateAgentStatusDisplay(statusData);
+            } else {
+                throw new Error(statusData.error || 'Failed to get agent status');
+            }
+        } catch (error) {
+            console.error('❌ Failed to refresh agent status:', error);
+            this.showToast('Failed to refresh agent status', 'error');
+        }
+    }
+
+    updateAgentStatusDisplay(statusData) {
+        const activeAgentsEl = document.getElementById('active-agents');
+        const systemHealthEl = document.getElementById('system-health');
+        const workflowsCompletedEl = document.getElementById('workflows-completed');
+
+        if (activeAgentsEl) {
+            const agentCount = statusData.system?.agents?.totalAgents || 0;
+            activeAgentsEl.textContent = agentCount;
+        }
+
+        if (systemHealthEl) {
+            const health = statusData.system?.agents?.systemHealth || 'unknown';
+            systemHealthEl.textContent = health;
+            systemHealthEl.className = `stat-value status-${health}`;
+        }
+
+        if (workflowsCompletedEl) {
+            const completed = statusData.system?.orchestrator?.completedWorkflows || 0;
+            workflowsCompletedEl.textContent = completed;
+        }
+
+        console.log('📊 Agent status updated:', statusData);
+    }
+
+    useMultiAgentContent() {
+        const useContentBtn = document.getElementById('use-content');
+        const content = useContentBtn?.dataset.content;
+
+        if (!content) {
+            this.showToast('No content available to use', 'warning');
+            return;
+        }
+
+        // Extract the main tweet content from the strategy
+        const tweetContent = this.extractTweetFromStrategy(content);
+
+        // Switch to queue tab and populate compose area
+        this.switchTab('queue');
+        
+        const composeTextarea = document.getElementById('new-tweet-content');
+        if (composeTextarea) {
+            composeTextarea.value = tweetContent;
+            this.handleComposeInput({ target: composeTextarea });
+            composeTextarea.focus();
+        }
+
+        this.showToast('Content added to compose area!', 'success');
+    }
+
+    extractTweetFromStrategy(strategy) {
+        // Simple extraction - look for tweet content patterns
+        const lines = strategy.split('\n');
+        
+        // Look for lines that look like tweets (short, hashtags, emojis)
+        for (const line of lines) {
+            const cleaned = line.trim().replace(/^[*-]\s*/, '');
+            if (cleaned.length > 20 && cleaned.length <= 280 && 
+                (cleaned.includes('#') || cleaned.includes('🎵') || cleaned.includes('DJ'))) {
+                return cleaned;
+            }
+        }
+
+        // Fallback: take first substantial line
+        for (const line of lines) {
+            const cleaned = line.trim().replace(/^[*-]\s*/, '');
+            if (cleaned.length > 20 && cleaned.length <= 280) {
+                return cleaned;
+            }
+        }
+
+        return strategy.substring(0, 280).trim();
+    }
+
+    refineMultiAgentResults() {
+        if (!this.lastMultiAgentResults) {
+            this.showToast('No results to refine', 'warning');
+            return;
+        }
+
+        // Switch back to input area with current results as context
+        const input = document.getElementById('multi-agent-input');
+        if (input) {
+            const currentValue = input.value;
+            input.value = `${currentValue}\n\nPlease refine and improve the above results.`;
+            input.focus();
+        }
+
+        this.showToast('Ready to refine results - please provide additional guidance', 'info');
+    }
+
+    saveMultiAgentStrategy() {
+        if (!this.lastMultiAgentResults) {
+            this.showToast('No strategy to save', 'warning');
+            return;
+        }
+
+        // Create a downloadable strategy file
+        const strategy = {
+            timestamp: new Date().toISOString(),
+            workflow: this.lastMultiAgentResults.workflow,
+            agents: this.lastMultiAgentResults.agents,
+            results: this.lastMultiAgentResults.results,
+            finalOutput: this.lastMultiAgentResults.finalOutput
+        };
+
+        const blob = new Blob([JSON.stringify(strategy, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `twitter-strategy-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.showToast('Strategy saved successfully!', 'success');
+    }
+
+    clearMultiAgent() {
+        const input = document.getElementById('multi-agent-input');
+        const results = document.getElementById('multi-agent-results');
+
+        if (input) {
+            input.value = '';
+        }
+
+        if (results) {
+            results.style.display = 'none';
+        }
+
+        // Clear workflow selection
+        document.querySelectorAll('.workflow-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        this.selectedWorkflow = null;
+        this.lastMultiAgentResults = null;
+
+        this.showToast('Multi-agent interface cleared', 'info');
     }
 }
 
