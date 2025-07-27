@@ -12,9 +12,22 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let openai = null;
+let openaiAvailable = false;
+
+try {
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    openaiAvailable = true;
+    console.log('✅ OpenAI client initialized successfully');
+  } else {
+    console.log('⚠️  OpenAI API key not provided - AI chat will be disabled');
+  }
+} catch (error) {
+  console.log('⚠️  Failed to initialize OpenAI client:', error.message);
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1286,6 +1299,14 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'Message is required' });
   }
 
+  // Check if OpenAI is available
+  if (!openaiAvailable || !openai) {
+    return res.status(503).json({ 
+      error: 'AI chat is currently unavailable', 
+      details: 'OpenAI API key not configured or invalid. Please check your OPENAI_API_KEY environment variable.' 
+    });
+  }
+
   try {
     console.log(`AI Chat request: ${message.substring(0, 100)}...`);
 
@@ -1334,6 +1355,7 @@ Be helpful, creative, and focused on practical Twitter/music industry advice. Ke
       errorMessage = 'OpenAI API quota exceeded. Please check your billing.';
     } else if (error.code === 'invalid_api_key') {
       errorMessage = 'Invalid OpenAI API key. Please check your configuration.';
+      openaiAvailable = false; // Disable OpenAI for future requests
     } else if (error.code === 'rate_limit_exceeded') {
       errorMessage = 'OpenAI rate limit exceeded. Please try again in a moment.';
     }
