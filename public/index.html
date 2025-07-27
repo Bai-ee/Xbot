@@ -41,14 +41,36 @@
             <div class="compose-section">
                 <h3>✍️ Compose New Tweet</h3>
                 <div class="compose-card">
-                    <textarea 
-                        id="new-tweet-content"
-                        class="tweet-textarea" 
-                        placeholder="What's happening? Write your tweet here..."
-                        maxlength="280"
-                    ></textarea>
+                    <textarea id="new-tweet-content" class="tweet-textarea" placeholder="What's happening? Write your tweet here..." maxlength="280"></textarea>
+                    
+                    <!-- Media Upload Section -->
+                    <div class="media-upload-section">
+                        <div class="media-controls">
+                            <label for="media-upload" class="media-upload-btn">
+                                📎 Add Media
+                                <input type="file" id="media-upload" accept="image/*,video/*" multiple style="display: none;">
+                            </label>
+                            <button id="clear-media" class="btn btn-secondary clear-media-btn" style="display: none;">🗑️ Clear Media</button>
+                        </div>
+                        
+                        <!-- Media Preview Area -->
+                        <div id="media-preview" class="media-preview" style="display: none;">
+                            <div class="media-preview-header">
+                                <span class="media-count">Media Files:</span>
+                            </div>
+                            <div id="media-preview-container" class="media-preview-container">
+                                <!-- Media previews will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="tweet-footer">
-                        <div class="character-count" id="new-tweet-char-count">0/280 characters</div>
+                        <div class="tweet-info">
+                            <div class="character-count" id="new-tweet-char-count">0/280 characters</div>
+                            <div class="media-info" id="media-info" style="display: none;">
+                                <span id="media-count-text">0 files</span>
+                            </div>
+                        </div>
                         <div class="compose-actions">
                             <button id="post-directly" class="btn btn-success">🚀 Post Now</button>
                             <button id="save-draft" class="btn btn-primary">💾 Save as Draft</button>

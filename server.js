@@ -1,13 +1,38 @@
-// Creative Tech DJ Twitter Bot Dashboard Server
+// Creative Tech DJ Twitter Bot Dashboard
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs-extra');
 const path = require('path');
+const multer = require('multer');
 const { TwitterApi } = require('twitter-api-v2');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: 'temp-uploads/', // Temporary directory for uploads
+  limits: {
+    fileSize: 15 * 1024 * 1024, // 15MB limit
+    files: 4 // Max 4 files (Twitter's limit)
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file types
+    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedVideoTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm'];
+    const isValidType = [...allowedImageTypes, ...allowedVideoTypes].includes(file.mimetype);
+    
+    if (isValidType) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not supported`), false);
+    }
+  }
+});
+
+// Ensure temp directory exists
+fs.ensureDirSync('temp-uploads');
 
 // Middleware
 app.use(bodyParser.json());
@@ -67,55 +92,98 @@ function saveQueue(queue) {
   fs.writeJsonSync(QUEUE_FILE, queue, { spaces: 2 });
 }
 
+// Generate random DJ tweet
 function generateRandomTweet() {
-  const baseTweet = djTweets[Math.floor(Math.random() * djTweets.length)];
+  const tweet = djTweets[Math.floor(Math.random() * djTweets.length)];
   
-  // Add some randomization to make tweets unique
-  const shouldAddTimeElement = Math.random() > 0.7;
-  const shouldAddMusicEmoji = Math.random() > 0.6;
-  const shouldAddVibeWord = Math.random() > 0.8;
+  // Add more uniqueness with dynamic elements
+  const timeEmojis = ['🌅', '🌞', '🌙', '⭐', '🌟', '✨', '💫'];
+  const musicEmojis = ['🎵', '🎶', '🎼', '🎧', '🎤', '🎹', '🥁', '🎺', '🎸', '🎻'];
+  const vibeWords = ['energy', 'vibes', 'beats', 'rhythm', 'groove', 'flow', 'sound', 'music'];
   
-  let tweet = baseTweet;
+  const randomTimeEmoji = timeEmojis[Math.floor(Math.random() * timeEmojis.length)];
+  const randomMusicEmoji = musicEmojis[Math.floor(Math.random() * musicEmojis.length)];
+  const randomVibe = vibeWords[Math.floor(Math.random() * vibeWords.length)];
   
-  if (shouldAddTimeElement) {
-    const timeEmoji = timeBasedEmojis[Math.floor(Math.random() * timeBasedEmojis.length)];
-    const currentHour = new Date().getHours();
-    let timePhrase = '';
+  // Add timestamp-based hashtag for uniqueness
+  const timestamp = Date.now().toString(36);
+  const uniqueTag = `#CreativeTech${timestamp}`;
+  
+  return `${randomTimeEmoji} ${tweet} ${randomMusicEmoji} #${randomVibe} ${uniqueTag}`;
+}
+
+// Helper function to upload media to Twitter
+async function uploadMediaToTwitter(filePath, mediaType) {
+  try {
+    console.log(`📤 Uploading ${mediaType} to Twitter:`, filePath);
     
-    if (currentHour < 12) timePhrase = 'This morning ';
-    else if (currentHour < 17) timePhrase = 'This afternoon ';
-    else timePhrase = 'Tonight ';
+    // Upload media to Twitter
+    const mediaUpload = await client.v1.uploadMedia(filePath, {
+      mimeType: mediaType
+    });
     
-    tweet = `${timeEmoji} ${timePhrase}${tweet.toLowerCase()}`;
+    console.log(`✅ Media uploaded successfully. Media ID: ${mediaUpload}`);
+    return mediaUpload;
+  } catch (error) {
+    console.error('❌ Error uploading media to Twitter:', error);
+    throw new Error(`Failed to upload media: ${error.message}`);
+  }
+}
+
+// Helper function to process uploaded files
+async function processUploadedFiles(files) {
+  if (!files || files.length === 0) {
+    return [];
   }
   
-  if (shouldAddMusicEmoji) {
-    const musicEmoji = musicEmojis[Math.floor(Math.random() * musicEmojis.length)];
-    tweet = `${tweet} ${musicEmoji}`;
+  const mediaIds = [];
+  
+  try {
+    // Process each uploaded file
+    for (const file of files) {
+      const mediaId = await uploadMediaToTwitter(file.path, file.mimetype);
+      mediaIds.push(mediaId);
+      
+      // Clean up temporary file
+      try {
+        await fs.remove(file.path);
+        console.log(`🗑️ Cleaned up temp file: ${file.filename}`);
+      } catch (cleanupError) {
+        console.warn('⚠️ Failed to cleanup temp file:', cleanupError.message);
+      }
+    }
+    
+    return mediaIds;
+  } catch (error) {
+    // Clean up any remaining temp files on error
+    for (const file of files) {
+      try {
+        await fs.remove(file.path);
+      } catch (cleanupError) {
+        console.warn('⚠️ Failed to cleanup temp file on error:', cleanupError.message);
+      }
+    }
+    throw error;
   }
+}
+
+// Helper function to extract media files from multer fields
+function extractMediaFiles(req) {
+  const files = [];
   
-  if (shouldAddVibeWord) {
-    const vibeWord = vibeWords[Math.floor(Math.random() * vibeWords.length)];
-    tweet = tweet.replace(/\!/, ` - ${vibeWord}!`);
-  }
+  // Multer stores files with field names like media_0, media_1, etc.
+  Object.keys(req.files || {}).forEach(fieldName => {
+    if (fieldName.startsWith('media_')) {
+      const fileArray = req.files[fieldName];
+      if (Array.isArray(fileArray)) {
+        files.push(...fileArray);
+      } else {
+        files.push(fileArray);
+      }
+    }
+  });
   
-  // Add a timestamp-based element to ensure uniqueness
-  const timestamp = Date.now().toString().slice(-4);
-  const hashtagVariations = ['#DJ' + timestamp, '#Studio' + timestamp, '#Creative' + timestamp];
-  const uniqueTag = hashtagVariations[Math.floor(Math.random() * hashtagVariations.length)];
-  
-  // Ensure tweet doesn't exceed 280 characters
-  let finalTweet = tweet;
-  if (finalTweet.length > 250) { // Leave room for unique tag
-    finalTweet = finalTweet.substring(0, 240) + '...';
-  }
-  
-  // Only add unique tag if there's room
-  if ((finalTweet + ' ' + uniqueTag).length <= 280) {
-    finalTweet += ' ' + uniqueTag;
-  }
-  
-  return finalTweet;
+  return files;
 }
 
 // Routes
@@ -313,47 +381,78 @@ app.post('/api/auto-generate', async (req, res) => {
   }
 });
 
-// Post tweet directly to Twitter without queue
-app.post('/api/post-direct', async (req, res) => {
+// Post tweet directly to Twitter
+app.post('/api/post-direct', upload.fields([
+  { name: 'media_0', maxCount: 1 },
+  { name: 'media_1', maxCount: 1 },
+  { name: 'media_2', maxCount: 1 },
+  { name: 'media_3', maxCount: 1 }
+]), async (req, res) => {
   const { content } = req.body;
   
-  if (!content || content.trim().length === 0) {
-    return res.status(400).json({ error: 'Tweet content is required' });
-  }
-  
-  if (content.length > 280) {
-    return res.status(400).json({ error: 'Tweet content exceeds 280 characters' });
+  if (!content && (!req.files || Object.keys(req.files).length === 0)) {
+    return res.status(400).json({ error: 'Tweet content or media is required' });
   }
   
   try {
-    // Post directly to Twitter
-    console.log(`Posting tweet directly: ${content.substring(0, 50)}...`);
-    const tweetResponse = await client.v2.tweet(content);
-    console.log('Tweet posted successfully to Twitter:', tweetResponse.data?.id);
+    console.log(`Posting tweet directly: ${content || 'Media-only tweet'}...`);
     
-    // Create tweet object for display purposes
-    const tweet = {
+    // Extract and process media files
+    const mediaFiles = extractMediaFiles(req);
+    const mediaIds = await processUploadedFiles(mediaFiles);
+    
+    // Create tweet options
+    const tweetOptions = {};
+    if (content && content.trim()) {
+      tweetOptions.text = content.trim();
+    }
+    if (mediaIds.length > 0) {
+      tweetOptions.media = { media_ids: mediaIds };
+    }
+    
+    // Post to Twitter
+    const tweet = await client.v2.tweet(tweetOptions);
+    
+    // Create tweet object for storage
+    const tweetData = {
       id: Date.now().toString(),
-      content: content.trim(),
+      content: content || '',
       status: 'posted',
       createdAt: new Date().toISOString(),
       postedAt: new Date().toISOString(),
-      twitterId: tweetResponse.data?.id,
-      directPost: true
+      twitterId: tweet.data.id,
+      autoGenerated: false,
+      media: mediaFiles.map(file => ({
+        type: file.mimetype.startsWith('image/') ? 'image' : 'video',
+        originalName: file.originalname,
+        size: file.size
+      }))
     };
     
-    // Optionally save to queue for record keeping
+    // Add to queue for record keeping
     const queue = loadQueue();
-    queue.tweets.unshift(tweet);
+    queue.tweets.unshift(tweetData);
     saveQueue(queue);
     
-    res.json({ success: true, tweet });
+    console.log(`Tweet posted successfully to Twitter: ${tweet.data.id}`);
+    
+    res.json({ success: true, tweet: tweetData, twitterId: tweet.data.id });
   } catch (error) {
     console.error('Twitter API Error Details:', {
       code: error.code,
       message: error.message,
       data: error.data
     });
+    
+    // Clean up any remaining temp files on error
+    try {
+      const mediaFiles = extractMediaFiles(req);
+      for (const file of mediaFiles) {
+        await fs.remove(file.path);
+      }
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temp files after error:', cleanupError.message);
+    }
     
     let errorMessage = 'Failed to post tweet';
     
@@ -381,32 +480,175 @@ app.post('/api/post-direct', async (req, res) => {
 });
 
 // Save tweet as draft
-app.post('/api/save-draft', async (req, res) => {
+app.post('/api/save-draft', upload.fields([
+  { name: 'media_0', maxCount: 1 },
+  { name: 'media_1', maxCount: 1 },
+  { name: 'media_2', maxCount: 1 },
+  { name: 'media_3', maxCount: 1 }
+]), async (req, res) => {
   const { content } = req.body;
   
-  if (!content || content.trim().length === 0) {
-    return res.status(400).json({ error: 'Tweet content is required' });
+  if (!content && (!req.files || Object.keys(req.files).length === 0)) {
+    return res.status(400).json({ error: 'Tweet content or media is required' });
   }
   
   try {
+    // Extract media files information (don't upload to Twitter yet)
+    const mediaFiles = extractMediaFiles(req);
+    const mediaInfo = [];
+    
+    // Process media files for storage info (but keep files for later upload)
+    for (const file of mediaFiles) {
+      // Store media info for the draft
+      mediaInfo.push({
+        type: file.mimetype.startsWith('image/') ? 'image' : 'video',
+        originalName: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+        tempPath: file.path, // Keep temp file for later use
+        filename: file.filename
+      });
+    }
+    
     const queue = loadQueue();
     const newTweet = {
       id: Date.now().toString(),
-      content: content.trim(),
+      content: content || '',
       status: 'pending',
       createdAt: new Date().toISOString(),
       autoGenerated: false,
-      draft: true
+      draft: true,
+      media: mediaInfo
     };
     
     queue.tweets.unshift(newTweet);
     saveQueue(queue);
     
     const pendingCount = queue.tweets.filter(t => t.status === 'pending').length;
+    
+    console.log(`Draft saved with ${mediaInfo.length} media files`);
     res.json({ success: true, tweet: newTweet, pendingCount });
   } catch (error) {
     console.error('Error saving draft:', error);
+    
+    // Clean up temp files on error
+    try {
+      const mediaFiles = extractMediaFiles(req);
+      for (const file of mediaFiles) {
+        await fs.remove(file.path);
+      }
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temp files after error:', cleanupError.message);
+    }
+    
     res.status(500).json({ error: 'Failed to save draft' });
+  }
+});
+
+// Post tweet from queue
+app.post('/api/tweet/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const queue = loadQueue();
+    const tweet = queue.tweets.find(t => t.id === id);
+    
+    if (!tweet) {
+      return res.status(404).json({ error: 'Tweet not found' });
+    }
+    
+    if (tweet.status === 'posted') {
+      return res.status(400).json({ error: 'Tweet already posted' });
+    }
+    
+    console.log(`Attempting to post tweet: ${tweet.content.substring(0, 50)}...`);
+    
+    // Handle media files if present
+    let mediaIds = [];
+    if (tweet.media && tweet.media.length > 0) {
+      console.log(`📎 Processing ${tweet.media.length} media files...`);
+      
+      // Upload media files to Twitter
+      for (const mediaInfo of tweet.media) {
+        if (mediaInfo.tempPath && await fs.pathExists(mediaInfo.tempPath)) {
+          try {
+            const mediaId = await uploadMediaToTwitter(mediaInfo.tempPath, mediaInfo.mimetype);
+            mediaIds.push(mediaId);
+            
+            // Clean up temp file after successful upload
+            await fs.remove(mediaInfo.tempPath);
+            console.log(`✅ Uploaded and cleaned up: ${mediaInfo.originalName}`);
+          } catch (uploadError) {
+            console.error(`❌ Failed to upload media: ${mediaInfo.originalName}`, uploadError);
+            // Clean up temp file even on failure
+            try {
+              await fs.remove(mediaInfo.tempPath);
+            } catch (cleanupError) {
+              console.warn('Failed to cleanup temp file:', cleanupError.message);
+            }
+            throw new Error(`Failed to upload media: ${mediaInfo.originalName}`);
+          }
+        } else {
+          console.warn(`⚠️ Media file not found: ${mediaInfo.tempPath || 'No path'}`);
+        }
+      }
+    }
+    
+    // Create tweet options
+    const tweetOptions = {};
+    if (tweet.content && tweet.content.trim()) {
+      tweetOptions.text = tweet.content.trim();
+    }
+    if (mediaIds.length > 0) {
+      tweetOptions.media = { media_ids: mediaIds };
+    }
+    
+    // Post to Twitter
+    const twitterResponse = await client.v2.tweet(tweetOptions);
+    
+    // Update tweet status
+    tweet.status = 'posted';
+    tweet.postedAt = new Date().toISOString();
+    tweet.twitterId = twitterResponse.data.id;
+    
+    // Update media info to remove temp paths
+    if (tweet.media) {
+      tweet.media = tweet.media.map(media => ({
+        type: media.type,
+        originalName: media.originalName,
+        size: media.size
+        // Remove tempPath and filename as they're no longer needed
+      }));
+    }
+    
+    saveQueue(queue);
+    
+    console.log(`Tweet posted successfully to Twitter: ${twitterResponse.data.id}`);
+    res.json({ success: true, tweet, twitterId: twitterResponse.data.id });
+  } catch (error) {
+    console.error('Twitter API Error:', error);
+    let errorMessage = 'Failed to post tweet';
+    
+    if (error.code === 403) {
+      if (error.data && error.data.detail && error.data.detail.includes('duplicate')) {
+        errorMessage = 'Tweet content appears to be a duplicate. Try editing to make it more unique.';
+      } else {
+        errorMessage = 'Access forbidden. Your API key may not have write permissions.';
+      }
+    } else if (error.code === 401) {
+      errorMessage = 'Authentication failed. Check your Twitter API credentials.';
+    } else if (error.code === 429) {
+      errorMessage = 'Rate limit exceeded. Please wait before posting again.';
+    } else if (error.code >= 500) {
+      errorMessage = 'Twitter server error. Please try again later.';
+    }
+    
+    res.status(error.code === 429 ? 429 : 500).json({
+      error: errorMessage,
+      details: error.message,
+      code: error.code,
+      canRetry: error.code === 429 || error.code >= 500
+    });
   }
 });
 

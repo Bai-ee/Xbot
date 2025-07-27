@@ -6,6 +6,12 @@ class TwitterBotDashboard {
         this.currentTab = 'tweets';
         this.updateDebounceTimer = null;
         this.autoRefreshTimer = null;
+        this.loading = false;
+        this.mediaFiles = []; // Store uploaded media files
+        this.maxMediaFiles = 4; // Twitter's limit
+        this.maxFileSize = 15 * 1024 * 1024; // 15MB max file size
+        this.supportedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        this.supportedVideoTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm'];
         this.init();
     }
 
@@ -67,6 +73,18 @@ class TwitterBotDashboard {
 
         // Analytics refresh button
         document.getElementById('refresh-analytics')?.addEventListener('click', () => this.refreshAnalytics());
+
+        // Media upload event listeners
+        const mediaUploadInput = document.getElementById('media-upload');
+        const clearMediaBtn = document.getElementById('clear-media');
+        
+        if (mediaUploadInput) {
+            mediaUploadInput.addEventListener('change', (e) => this.handleMediaUpload(e));
+        }
+        
+        if (clearMediaBtn) {
+            clearMediaBtn.addEventListener('click', () => this.clearAllMedia());
+        }
 
         // Auto-refresh when tab becomes visible
         document.addEventListener('visibilitychange', () => {
@@ -653,111 +671,319 @@ class TwitterBotDashboard {
         
         if (charCountEl) {
             charCountEl.textContent = `${charCount}/280 characters`;
-            charCountEl.className = `character-count ${charCount > 280 ? 'error' : charCount > 260 ? 'warning' : ''}`;
+            
+            // Update character count color based on limit
+            if (charCount > 280) {
+                charCountEl.style.color = '#e74c3c';
+            } else if (charCount > 250) {
+                charCountEl.style.color = '#f39c12';
+            } else {
+                charCountEl.style.color = '#7f8c8d';
+            }
         }
+        
+        this.updateComposeButtons();
+    }
 
-        // Enable/disable post button based on content
+    handleMediaUpload(event) {
+        const files = Array.from(event.target.files);
+        
+        if (files.length === 0) return;
+        
+        // Check if adding these files would exceed the limit
+        if (this.mediaFiles.length + files.length > this.maxMediaFiles) {
+            this.showToast(`Maximum ${this.maxMediaFiles} media files allowed`, 'error');
+            return;
+        }
+        
+        files.forEach(file => {
+            if (this.validateMediaFile(file)) {
+                this.addMediaFile(file);
+            }
+        });
+        
+        // Clear the input so the same file can be selected again
+        event.target.value = '';
+        
+        this.updateMediaDisplay();
+        this.updateComposeButtons();
+    }
+
+    validateMediaFile(file) {
+        // Check file size
+        if (file.size > this.maxFileSize) {
+            this.showToast(`File "${file.name}" is too large. Maximum size is 15MB.`, 'error');
+            return false;
+        }
+        
+        // Check file type
+        const isImage = this.supportedImageTypes.includes(file.type);
+        const isVideo = this.supportedVideoTypes.includes(file.type);
+        
+        if (!isImage && !isVideo) {
+            this.showToast(`File "${file.name}" is not a supported format.`, 'error');
+            return false;
+        }
+        
+        return true;
+    }
+
+    addMediaFile(file) {
+        const mediaFile = {
+            id: Date.now() + Math.random(), // Unique ID
+            file: file,
+            type: file.type.startsWith('image/') ? 'image' : 'video',
+            name: file.name,
+            size: file.size,
+            preview: null
+        };
+        
+        this.mediaFiles.push(mediaFile);
+        this.generateMediaPreview(mediaFile);
+    }
+
+    generateMediaPreview(mediaFile) {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            mediaFile.preview = e.target.result;
+            this.updateMediaDisplay();
+        };
+        
+        reader.onerror = () => {
+            this.showToast(`Failed to load preview for "${mediaFile.name}"`, 'error');
+            this.removeMediaFile(mediaFile.id);
+        };
+        
+        reader.readAsDataURL(mediaFile.file);
+    }
+
+    removeMediaFile(mediaId) {
+        this.mediaFiles = this.mediaFiles.filter(media => media.id !== mediaId);
+        this.updateMediaDisplay();
+        this.updateComposeButtons();
+    }
+
+    clearAllMedia() {
+        this.mediaFiles = [];
+        this.updateMediaDisplay();
+        this.updateComposeButtons();
+    }
+
+    updateMediaDisplay() {
+        const mediaPreview = document.getElementById('media-preview');
+        const mediaPreviewContainer = document.getElementById('media-preview-container');
+        const clearMediaBtn = document.getElementById('clear-media');
+        const mediaInfo = document.getElementById('media-info');
+        const mediaCountText = document.getElementById('media-count-text');
+        
+        if (this.mediaFiles.length === 0) {
+            mediaPreview.style.display = 'none';
+            clearMediaBtn.style.display = 'none';
+            mediaInfo.style.display = 'none';
+            return;
+        }
+        
+        // Show media preview section
+        mediaPreview.style.display = 'block';
+        clearMediaBtn.style.display = 'inline-block';
+        mediaInfo.style.display = 'block';
+        
+        // Update media count
+        const fileText = this.mediaFiles.length === 1 ? 'file' : 'files';
+        mediaCountText.textContent = `${this.mediaFiles.length} ${fileText}`;
+        
+        // Clear and rebuild preview container
+        mediaPreviewContainer.innerHTML = '';
+        
+        this.mediaFiles.forEach(mediaFile => {
+            const previewItem = this.createMediaPreviewItem(mediaFile);
+            mediaPreviewContainer.appendChild(previewItem);
+        });
+    }
+
+    createMediaPreviewItem(mediaFile) {
+        const item = document.createElement('div');
+        item.className = 'media-preview-item';
+        item.setAttribute('data-type', mediaFile.type);
+        
+        if (mediaFile.preview) {
+            // Create media element
+            let mediaElement;
+            if (mediaFile.type === 'image') {
+                mediaElement = document.createElement('img');
+                mediaElement.src = mediaFile.preview;
+                mediaElement.alt = mediaFile.name;
+            } else {
+                mediaElement = document.createElement('video');
+                mediaElement.src = mediaFile.preview;
+                mediaElement.controls = false;
+                mediaElement.muted = true;
+            }
+            
+            item.appendChild(mediaElement);
+        } else {
+            // Show loading state
+            item.classList.add('loading');
+            const spinner = document.createElement('div');
+            spinner.className = 'media-loading-spinner';
+            item.appendChild(spinner);
+        }
+        
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'media-remove-btn';
+        removeBtn.innerHTML = '×';
+        removeBtn.title = 'Remove media';
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.removeMediaFile(mediaFile.id);
+        });
+        item.appendChild(removeBtn);
+        
+        // File info
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'media-file-info';
+        fileInfo.textContent = `${mediaFile.name} (${this.formatFileSize(mediaFile.size)})`;
+        item.appendChild(fileInfo);
+        
+        return item;
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    updateComposeButtons() {
         const postBtn = document.getElementById('post-directly');
-        const saveBtn = document.getElementById('save-draft');
+        const saveDraftBtn = document.getElementById('save-draft');
+        const textarea = document.getElementById('new-tweet-content');
+        
+        const hasContent = textarea.value.trim().length > 0;
+        const hasMedia = this.mediaFiles.length > 0;
+        const canPost = hasContent || hasMedia;
         
         if (postBtn) {
-            postBtn.disabled = charCount === 0 || charCount > 280;
+            postBtn.disabled = !canPost;
+            postBtn.title = canPost ? 'Post tweet with media' : 'Add content or media to post';
         }
-        if (saveBtn) {
-            saveBtn.disabled = charCount === 0;
+        
+        if (saveDraftBtn) {
+            saveDraftBtn.disabled = !canPost;
+            saveDraftBtn.title = canPost ? 'Save tweet as draft' : 'Add content or media to save';
         }
     }
 
     async postDirectly() {
-        const textarea = document.getElementById('new-tweet-content');
-        const content = textarea.value.trim();
+        const content = document.getElementById('new-tweet-content').value.trim();
         
-        if (!content) {
-            this.showToast('Please write something to tweet!', 'warning');
+        if (!content && this.mediaFiles.length === 0) {
+            this.showToast('Please add content or media to your tweet', 'error');
             return;
         }
-
-        if (content.length > 280) {
-            this.showToast('Tweet is too long! Please shorten it.', 'error');
-            return;
-        }
-
-        this.showLoading(true);
+        
+        const postBtn = document.getElementById('post-directly');
+        const originalText = postBtn.textContent;
+        
         try {
-            // Post directly to Twitter without saving to queue first
+            postBtn.disabled = true;
+            postBtn.textContent = '🚀 Posting...';
+            
+            // Create FormData to handle file uploads
+            const formData = new FormData();
+            formData.append('content', content);
+            
+            // Add media files
+            this.mediaFiles.forEach((mediaFile, index) => {
+                formData.append(`media_${index}`, mediaFile.file);
+            });
+            
             const response = await fetch('/api/post-direct', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content })
+                body: formData
             });
-
+            
+            const result = await response.json();
+            
             if (response.ok) {
-                const result = await response.json();
+                this.showToast('Tweet posted successfully! 🎉', 'success');
+                
                 // Clear the compose area
-                textarea.value = '';
-                this.handleComposeInput({ target: textarea });
+                document.getElementById('new-tweet-content').value = '';
+                this.clearAllMedia();
+                this.handleComposeInput({ target: { value: '' } });
                 
-                // Add to tweets list for display
-                this.tweets.unshift(result.tweet);
-                this.renderTweets();
-                this.updateStats();
-                
-                this.showToast('🎉 Tweet posted successfully to Twitter!', 'success');
+                // Refresh the queue
+                await this.loadQueue();
             } else {
-                const errorData = await response.json();
-                console.error('Direct post failed:', errorData);
-                if (response.status === 403) {
-                    this.showToast('Tweet may be duplicate content. Try changing it slightly.', 'warning');
-                } else {
-                    this.showToast(`Failed to post tweet: ${errorData.error}`, 'error');
-                }
+                throw new Error(result.error || 'Failed to post tweet');
             }
         } catch (error) {
-            console.error('Error posting directly:', error);
-            this.showToast('Network error - please check your connection', 'error');
+            console.error('Error posting tweet:', error);
+            this.showToast(error.message || 'Failed to post tweet', 'error');
         } finally {
-            this.showLoading(false);
+            postBtn.disabled = false;
+            postBtn.textContent = originalText;
+            this.updateComposeButtons();
         }
     }
 
     async saveDraft() {
-        const textarea = document.getElementById('new-tweet-content');
-        const content = textarea.value.trim();
+        const content = document.getElementById('new-tweet-content').value.trim();
         
-        if (!content) {
-            this.showToast('Please write something to save!', 'warning');
+        if (!content && this.mediaFiles.length === 0) {
+            this.showToast('Please add content or media to save as draft', 'error');
             return;
         }
-
-        this.showLoading(true);
+        
+        const saveDraftBtn = document.getElementById('save-draft');
+        const originalText = saveDraftBtn.textContent;
+        
         try {
+            saveDraftBtn.disabled = true;
+            saveDraftBtn.textContent = '💾 Saving...';
+            
+            // Create FormData to handle file uploads
+            const formData = new FormData();
+            formData.append('content', content);
+            formData.append('draft', 'true');
+            
+            // Add media files
+            this.mediaFiles.forEach((mediaFile, index) => {
+                formData.append(`media_${index}`, mediaFile.file);
+            });
+            
             const response = await fetch('/api/save-draft', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content })
+                body: formData
             });
-
+            
+            const result = await response.json();
+            
             if (response.ok) {
-                const result = await response.json();
+                this.showToast('Draft saved successfully! 💾', 'success');
+                
                 // Clear the compose area
-                textarea.value = '';
-                this.handleComposeInput({ target: textarea });
+                document.getElementById('new-tweet-content').value = '';
+                this.clearAllMedia();
+                this.handleComposeInput({ target: { value: '' } });
                 
-                // Add to tweets list
-                this.tweets.unshift(result.tweet);
-                this.renderTweets();
-                this.updateStats();
-                
-                this.showToast('💾 Tweet saved as draft!', 'success');
+                // Refresh the queue
+                await this.loadQueue();
             } else {
-                const error = await response.json();
-                this.showToast(`Failed to save draft: ${error.error}`, 'error');
+                throw new Error(result.error || 'Failed to save draft');
             }
         } catch (error) {
             console.error('Error saving draft:', error);
-            this.showToast('Network error - please check your connection', 'error');
+            this.showToast(error.message || 'Failed to save draft', 'error');
         } finally {
-            this.showLoading(false);
+            saveDraftBtn.disabled = false;
+            saveDraftBtn.textContent = originalText;
+            this.updateComposeButtons();
         }
     }
 
