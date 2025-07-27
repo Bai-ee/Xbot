@@ -485,12 +485,8 @@ app.post('/api/refresh-analytics', async (req, res) => {
 
     console.log('Manual analytics refresh requested...');
     
-    // Force fresh fetch by clearing cache temporarily
-    const oldCache = analyticsCache.analytics;
-    delete analyticsCache.analytics;
-    
     try {
-      // Fetch fresh analytics
+      // Fetch fresh analytics - DON'T clear cache, only update on success
       const analyticsData = await fetchFreshAnalytics();
       
       // Update auto-refresh timestamp if this was successful
@@ -504,10 +500,6 @@ app.post('/api/refresh-analytics', async (req, res) => {
         message: `Analytics refreshed successfully. ${rateLimitInfo.remaining}/${rateLimitInfo.limit} refreshes remaining.`
       });
     } catch (error) {
-      // Restore old cache if fetch failed
-      if (oldCache) {
-        analyticsCache.analytics = oldCache;
-      }
       throw error;
     }
   } catch (error) {
@@ -536,53 +528,66 @@ app.post('/api/refresh-analytics', async (req, res) => {
 async function fetchFreshAnalytics() {
   console.log('Fetching fresh analytics data...');
   
-  // Get user profile with metrics
-  let profile = null;
+  // Start with existing cached data as fallback
+  let profile = analyticsCache.profile?.data || null;
+  let recentTweets = null;
+  let tweetsFromCache = false;
+  
+  // Get user profile with metrics - only update cache on success
   try {
     const profileResponse = await client.v2.me({
       'user.fields': ['public_metrics', 'created_at', 'description', 'profile_image_url', 'username', 'name']
     });
+    
+    // SUCCESS: Update profile cache and use fresh data
     profile = profileResponse.data;
+    analyticsCache.profile = { data: profile, timestamp: Date.now() };
     
     // Update rate limit info from successful call
     updateRateLimitInfo(profileResponse._headers);
+    console.log('✅ Profile data updated successfully');
   } catch (profileError) {
-    console.error('Profile fetch failed:', profileError.message);
+    console.log('❌ Profile fetch failed:', profileError.message);
     updateRateLimitInfo(profileError.headers);
     
-    // Use cached profile if available
+    // Keep using cached profile data (don't update cache)
     if (analyticsCache.profile) {
       profile = analyticsCache.profile.data;
-      console.log('Using cached profile data');
+      console.log('📦 Using cached profile data');
     } else {
-      throw profileError;
+      // No cached data available - this will result in fallback data
+      console.log('⚠️ No cached profile data available');
     }
   }
 
-  // Get recent tweets with metrics (handle rate limits gracefully)
-  let recentTweets = null;
-  let tweetsFromCache = false;
-  
+  // Get recent tweets with metrics - only update cache on success
   try {
     if (profile && profile.id) {
       const tweetsResponse = await client.v2.userTimeline(profile.id, {
         max_results: 10,
         'tweet.fields': ['created_at', 'public_metrics', 'text']
       });
+      
+      // SUCCESS: Update tweets cache and use fresh data
       recentTweets = tweetsResponse;
+      analyticsCache.recentTweets = { data: recentTweets.data, timestamp: Date.now() };
       
       // Update rate limit info
       updateRateLimitInfo(tweetsResponse._headers);
+      console.log('✅ Recent tweets updated successfully');
     }
   } catch (tweetsError) {
-    console.log('Recent tweets fetch failed:', tweetsError.code === 429 ? 'Rate limited' : tweetsError.message);
+    console.log('❌ Recent tweets fetch failed:', tweetsError.code === 429 ? 'Rate limited' : tweetsError.message);
     updateRateLimitInfo(tweetsError.headers);
     
-    // Try to use cached tweets
+    // Keep using cached tweets data (don't update cache)
     if (analyticsCache.recentTweets) {
       recentTweets = { data: analyticsCache.recentTweets.data };
       tweetsFromCache = true;
-      console.log('Using cached tweets data');
+      console.log('📦 Using cached tweets data');
+    } else {
+      // No cached data available
+      console.log('⚠️ No cached tweets data available');
     }
   }
 
@@ -605,8 +610,13 @@ async function fetchFreshAnalytics() {
     });
   }
 
+  // Build analytics data - use cached data as fallback for missing pieces
   const analyticsData = {
-    profile: profile || { public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 } },
+    profile: profile || { 
+      public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 },
+      name: 'Profile Unavailable',
+      username: 'unavailable'
+    },
     recent_engagement: {
       total_likes: totalLikes,
       total_retweets: totalRetweets,
@@ -619,25 +629,24 @@ async function fetchFreshAnalytics() {
     cache_info: {
       from_cache: tweetsFromCache,
       cached_at: tweetsFromCache ? analyticsCache.recentTweets?.timestamp : null,
-      refreshed_at: new Date().toISOString()
+      refreshed_at: new Date().toISOString(),
+      profile_from_cache: !profile || analyticsCache.profile?.data === profile,
+      tweets_from_cache: tweetsFromCache
     },
     rate_limit: rateLimitInfo
   };
 
-  // Cache the results with long TTL
-  const now = Date.now();
-  lastAnalyticsCall = now;
-  analyticsCache.analytics = {
-    data: analyticsData,
-    timestamp: now
-  };
-
-  // Cache individual components
-  if (profile) {
-    analyticsCache.profile = { data: profile, timestamp: now };
-  }
-  if (recentTweets && !tweetsFromCache) {
-    analyticsCache.recentTweets = { data: recentTweets.data, timestamp: now };
+  // Only update main analytics cache if we got at least some data
+  if (profile || recentTweets) {
+    const now = Date.now();
+    lastAnalyticsCall = now;
+    analyticsCache.analytics = {
+      data: analyticsData,
+      timestamp: now
+    };
+    console.log('✅ Analytics cache updated with latest data');
+  } else {
+    console.log('⚠️ No new data retrieved - analytics cache unchanged'); 
   }
 
   return analyticsData;
@@ -852,7 +861,7 @@ app.get('/api/tweet/:id/metrics', async (req, res) => {
 // Get analytics dashboard data
 app.get('/api/analytics', async (req, res) => {
   try {
-    // Check if we have cached data
+    // Check if we have cached data to return
     if (analyticsCache.analytics && analyticsCache.analytics.data) {
       const cachedData = analyticsCache.analytics.data;
       const cacheAge = Date.now() - analyticsCache.analytics.timestamp;
@@ -862,7 +871,7 @@ app.get('/api/analytics', async (req, res) => {
       
       if (!shouldAutoRefreshNow) {
         // Return cached data with updated cache info
-        console.log('Returning cached analytics data (no auto-refresh needed)');
+        console.log('📦 Returning cached analytics data (no auto-refresh needed)');
         return res.json({
           ...cachedData,
           cache_info: {
@@ -878,7 +887,7 @@ app.get('/api/analytics', async (req, res) => {
 
     // Auto-refresh if conditions are met
     if (shouldAutoRefresh() && rateLimitInfo.remaining > 0) {
-      console.log('Performing daily auto-refresh of analytics...');
+      console.log('🔄 Performing daily auto-refresh of analytics...');
       try {
         const freshData = await fetchFreshAnalytics();
         lastAutoRefresh = Date.now(); // Update auto-refresh timestamp
@@ -889,12 +898,12 @@ app.get('/api/analytics', async (req, res) => {
       }
     }
 
-    // Return cached data if available (no auto-refresh conditions met)
+    // Return cached data if available (preferred over fallback)
     if (analyticsCache.analytics && analyticsCache.analytics.data) {
       const cachedData = analyticsCache.analytics.data;
       const cacheAge = Date.now() - analyticsCache.analytics.timestamp;
       
-      console.log('Returning cached analytics data');
+      console.log('📦 Returning cached analytics data (auto-refresh failed or not available)');
       return res.json({
         ...cachedData,
         cache_info: {
@@ -909,8 +918,8 @@ app.get('/api/analytics', async (req, res) => {
       });
     }
 
-    // No cached data available - return comprehensive fallback
-    console.log('No cached analytics data available, returning comprehensive fallback');
+    // Only show fallback data if we have NEVER successfully fetched any data
+    console.log('⚠️ No cached analytics data available - showing initial fallback');
     
     const now = Date.now();
     const timeUntilReset = rateLimitInfo.resetTime ? Math.max(0, rateLimitInfo.resetTime - now) : null;
@@ -948,7 +957,8 @@ app.get('/api/analytics', async (req, res) => {
         refreshes_remaining: rateLimitInfo.remaining,
         total_refreshes: rateLimitInfo.limit,
         reset_time: rateLimitInfo.resetTime,
-        hours_until_reset: hoursUntilReset
+        hours_until_reset: hoursUntilReset,
+        never_fetched: true
       },
       rate_limit: {
         ...rateLimitInfo,
@@ -962,6 +972,26 @@ app.get('/api/analytics', async (req, res) => {
     res.json(fallbackData);
   } catch (error) {
     console.error('Error in analytics endpoint:', error);
+    
+    // Even on error, try to return cached data if available
+    if (analyticsCache.analytics && analyticsCache.analytics.data) {
+      console.log('📦 Returning cached data due to endpoint error');
+      const cachedData = analyticsCache.analytics.data;
+      const cacheAge = Date.now() - analyticsCache.analytics.timestamp;
+      
+      return res.json({
+        ...cachedData,
+        cache_info: {
+          ...cachedData.cache_info,
+          from_cache: true,
+          cache_age_hours: Math.floor(cacheAge / (60 * 60 * 1000)),
+          last_cached: new Date(analyticsCache.analytics.timestamp).toISOString(),
+          error_fallback: true
+        },
+        rate_limit: rateLimitInfo
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Analytics temporarily unavailable',
       details: error.message,
@@ -977,13 +1007,26 @@ app.get('/health', (req, res) => {
 
 // Clear analytics cache (for debugging/manual refresh)
 app.post('/api/clear-cache', (req, res) => {
+  const hadCachedData = Object.keys(analyticsCache).length > 0;
+  const cacheInfo = {
+    had_profile_cache: !!analyticsCache.profile,
+    had_tweets_cache: !!analyticsCache.recentTweets,
+    had_analytics_cache: !!analyticsCache.analytics,
+    cache_age_hours: analyticsCache.analytics ? 
+      Math.floor((Date.now() - analyticsCache.analytics.timestamp) / (60 * 60 * 1000)) : 0
+  };
+  
+  // Clear all caches
   analyticsCache = {};
   lastAnalyticsCall = 0;
-  console.log('Analytics cache cleared');
+  
+  console.log('🗑️ Analytics cache manually cleared');
   res.json({ 
     success: true, 
-    message: 'Analytics cache cleared',
-    timestamp: new Date().toISOString()
+    message: hadCachedData ? 'Analytics cache cleared - previous data removed' : 'No cached data was found to clear',
+    previous_cache_info: cacheInfo,
+    timestamp: new Date().toISOString(),
+    warning: 'Next analytics request will show fallback data until successful API call'
   });
 });
 
