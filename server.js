@@ -1561,6 +1561,7 @@ app.post('/api/workflow/:type', async (req, res) => {
       'engagement': ['engagement_optimizer'],
       'trend': ['trend_analyst'],
       'schedule': ['scheduler'],
+      'video': ['video_generator'],
       'comprehensive': ['content_creator', 'hashtag_specialist', 'engagement_optimizer', 'scheduler'],
       'creative': ['trend_analyst', 'content_creator', 'hashtag_specialist']
     };
@@ -1600,6 +1601,191 @@ app.post('/api/workflow/:type', async (req, res) => {
     res.status(500).json({
       success: false,
       error: `${workflowType} workflow failed`,
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
+// ARWEAVE VIDEO GENERATION ENDPOINTS
+// ============================================================================
+
+// Generate video using Arweave system
+app.post('/api/generate-video', async (req, res) => {
+  const { prompt, artist = 'random', duration = 30, style = 'classic' } = req.body;
+  
+  if (!prompt || prompt.trim().length === 0) {
+    return res.status(400).json({ error: 'Video generation prompt is required' });
+  }
+
+  // Check if OpenAI is available
+  if (!openaiAvailable || !openai) {
+    return res.status(503).json({ 
+      error: 'Video generation is currently unavailable', 
+      details: 'OpenAI API key not configured or invalid.' 
+    });
+  }
+
+  try {
+    console.log('🎬 Video generation request:', prompt.substring(0, 100) + '...');
+    
+    // Process through multi-agent system
+    const videoPrompt = `Generate a video for: ${prompt}. Artist: ${artist}, Duration: ${duration}s, Style: ${style}`;
+    
+    const result = await multiAgentOrchestrator.processRequest(videoPrompt, {
+      videoGeneration: true,
+      artist,
+      duration,
+      style,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('✅ Video generation completed');
+
+    res.json({
+      success: true,
+      video: result.results?.[0]?.result || null,
+      workflow: result.workflow,
+      agents: result.agents || [],
+      metadata: result.metadata || {}
+    });
+
+  } catch (error) {
+    console.error('❌ Video generation error:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Video generation failed',
+      details: error.message
+    });
+  }
+});
+
+// Get available artists for video generation
+app.get('/api/video/artists', async (req, res) => {
+  try {
+    const fs = require('fs-extra');
+    const path = require('path');
+    const artistsPath = path.join(process.cwd(), 'data', 'sample-artists.json');
+    
+    if (await fs.pathExists(artistsPath)) {
+      const artists = await fs.readJson(artistsPath);
+      
+      const artistsInfo = artists.map(artist => ({
+        name: artist.artistName,
+        genre: artist.artistGenre,
+        mixCount: artist.mixes.length,
+        image: artist.artistImageFilename
+      }));
+      
+      res.json({
+        success: true,
+        artists: artistsInfo,
+        total: artistsInfo.length
+      });
+    } else {
+      res.json({
+        success: true,
+        artists: [{
+          name: "Sample Artist",
+          genre: "electronic", 
+          mixCount: 1,
+          image: "sample.jpg"
+        }],
+        total: 1
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error fetching artists:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch artists',
+      details: error.message
+    });
+  }
+});
+
+// Get video generation history
+app.get('/api/video/history', async (req, res) => {
+  try {
+    const { ArweaveVideoAgent } = require('./src/agents/ArweaveVideoAgent.js');
+    const videoAgent = new ArweaveVideoAgent();
+    
+    const history = videoAgent.getVideoHistory();
+    
+    res.json({
+      success: true,
+      videos: history,
+      total: history.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching video history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch video history',
+      details: error.message
+    });
+  }
+});
+
+// Clean up video system temp files
+app.post('/api/video/cleanup', async (req, res) => {
+  try {
+    const { ArweaveVideoAgent } = require('./src/agents/ArweaveVideoAgent.js');
+    const videoAgent = new ArweaveVideoAgent();
+    
+    await videoAgent.cleanup();
+    
+    res.json({
+      success: true, 
+      message: 'Video system cleanup completed',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error during video cleanup:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Video cleanup failed',
+      details: error.message
+    });
+  }
+});
+
+// Quick video generation with defaults
+app.post('/api/video/quick', async (req, res) => {
+  try {
+    console.log('🚀 Quick video generation requested');
+    
+    // Generate a simple video with default settings
+    const quickPrompt = "Create a hello world video with sample artist and electronic music";
+    
+    const result = await multiAgentOrchestrator.processRequest(quickPrompt, {
+      videoGeneration: true,
+      artist: 'random',
+      duration: 30,
+      style: 'classic',
+      quick: true,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('✅ Quick video generation completed');
+
+    res.json({
+      success: true,
+      video: result.results?.[0]?.result || null,
+      workflow: result.workflow,
+      message: 'Quick video generated successfully',
+      metadata: result.metadata || {}
+    });
+
+  } catch (error) {
+    console.error('❌ Quick video generation error:', error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Quick video generation failed',
       details: error.message
     });
   }

@@ -290,7 +290,16 @@ class TwitterAgentFactory {
     this.agents.set('trend_analyst', new TrendAnalystAgent());
     this.agents.set('scheduler', new SchedulerAgent());
 
-    console.log('🤖 Initialized Twitter Content Agents:', Array.from(this.agents.keys()));
+    // Initialize video generation agent
+    try {
+      const { ArweaveVideoAgent } = require('./ArweaveVideoAgent.js');
+      this.agents.set('video_generator', new ArweaveVideoAgent());
+      console.log('✅ ArweaveVideoAgent initialized successfully');
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize ArweaveVideoAgent:', error.message);
+    }
+
+    console.log('🤖 Initialized Agents:', Array.from(this.agents.keys()));
   }
 
   getAgent(agentType) {
@@ -334,6 +343,7 @@ class TwitterAgentFactory {
 const twitterAgentFactory = new TwitterAgentFactory();
 
 module.exports = { 
+  BaseAgent,
   ContentCreatorAgent,
   HashtagSpecialistAgent,
   EngagementOptimizerAgent,

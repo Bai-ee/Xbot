@@ -142,6 +142,9 @@ class TwitterBotDashboard {
             case 'profile':
                 this.loadProfile();
                 break;
+            case 'video':
+                this.initializeVideoGeneration();
+                break;
         }
     }
 
@@ -1739,6 +1742,305 @@ class TwitterBotDashboard {
         this.lastMultiAgentResults = null;
 
         this.showToast('Multi-agent interface cleared', 'info');
+    }
+
+    // ============================================================================
+    // VIDEO GENERATION FUNCTIONALITY
+    // ============================================================================
+
+    initializeVideoGeneration() {
+        // Load available artists
+        this.loadAvailableArtists();
+        
+        // Setup video generation event listeners
+        const quickVideoBtn = document.getElementById('generate-quick-video');
+        const customVideoBtn = document.getElementById('generate-custom-video');
+        const regenerateBtn = document.getElementById('regenerate-video');
+        const refreshHistoryBtn = document.getElementById('refresh-video-history');
+        const cleanupBtn = document.getElementById('cleanup-video-files');
+
+        if (quickVideoBtn) {
+            quickVideoBtn.addEventListener('click', () => this.generateQuickVideo());
+        }
+
+        if (customVideoBtn) {
+            customVideoBtn.addEventListener('click', () => this.generateCustomVideo());
+        }
+
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', () => this.regenerateVideo());
+        }
+
+        if (refreshHistoryBtn) {
+            refreshHistoryBtn.addEventListener('click', () => this.loadVideoHistory());
+        }
+
+        if (cleanupBtn) {
+            cleanupBtn.addEventListener('click', () => this.cleanupVideoFiles());
+        }
+
+        // Load video history on initialization
+        this.loadVideoHistory();
+    }
+
+    async loadAvailableArtists() {
+        try {
+            const response = await fetch('/api/video/artists');
+            const data = await response.json();
+
+            if (data.success) {
+                this.populateArtistSelect(data.artists);
+                this.displayArtistsGrid(data.artists);
+            } else {
+                console.warn('Failed to load artists:', data.error);
+            }
+        } catch (error) {
+            console.error('Error loading artists:', error);
+        }
+    }
+
+    populateArtistSelect(artists) {
+        const artistSelect = document.getElementById('video-artist');
+        if (!artistSelect) return;
+
+        // Clear existing options except "random"
+        artistSelect.innerHTML = `<option value="random">🎲 Random Artist</option>`;
+
+        // Add artist options
+        artists.forEach(artist => {
+            const option = document.createElement('option');
+            option.value = artist.name;
+            option.textContent = `🎤 ${artist.name} (${artist.genre})`;
+            artistSelect.appendChild(option);
+        });
+    }
+
+    displayArtistsGrid(artists) {
+        const artistsGrid = document.getElementById('artists-grid');
+        if (!artistsGrid) return;
+
+        artistsGrid.innerHTML = '';
+
+        artists.forEach(artist => {
+            const artistCard = document.createElement('div');
+            artistCard.className = 'artist-card';
+            artistCard.innerHTML = `
+                <div class="artist-name">${artist.name}</div>
+                <div class="artist-genre">${artist.genre}</div>
+                <div class="artist-mixes">${artist.mixCount} mix${artist.mixCount !== 1 ? 'es' : ''}</div>
+            `;
+            artistsGrid.appendChild(artistCard);
+        });
+    }
+
+    async generateQuickVideo() {
+        const quickVideoBtn = document.getElementById('generate-quick-video');
+        const generateText = quickVideoBtn?.querySelector('.generate-text');
+        const generateLoading = quickVideoBtn?.querySelector('.generate-loading');
+
+        try {
+            this.setVideoGenerationLoading(true, quickVideoBtn, generateText, generateLoading);
+
+            const response = await fetch('/api/video/quick', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayVideoResult(data.video, data.workflow, data.metadata);
+                this.showToast('Quick video generated successfully!', 'success');
+                this.loadVideoHistory(); // Refresh history
+            } else {
+                throw new Error(data.error || 'Failed to generate quick video');
+            }
+        } catch (error) {
+            console.error('Quick video generation error:', error);
+            this.showToast(`Quick video generation failed: ${error.message}`, 'error');
+        } finally {
+            this.setVideoGenerationLoading(false, quickVideoBtn, generateText, generateLoading);
+        }
+    }
+
+    async generateCustomVideo() {
+        const customVideoBtn = document.getElementById('generate-custom-video');
+        const generateText = customVideoBtn?.querySelector('.generate-text');
+        const generateLoading = customVideoBtn?.querySelector('.generate-loading');
+
+        // Get form values
+        const prompt = document.getElementById('video-prompt')?.value?.trim();
+        const artist = document.getElementById('video-artist')?.value || 'random';
+        const duration = parseInt(document.getElementById('video-duration')?.value) || 30;
+        const style = document.getElementById('video-style')?.value || 'classic';
+
+        if (!prompt) {
+            this.showToast('Please describe your video before generating', 'warning');
+            return;
+        }
+
+        try {
+            this.setVideoGenerationLoading(true, customVideoBtn, generateText, generateLoading);
+
+            const response = await fetch('/api/generate-video', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt,
+                    artist,
+                    duration,
+                    style
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayVideoResult(data.video, data.workflow, data.metadata);
+                this.showToast('Custom video generated successfully!', 'success');
+                this.loadVideoHistory(); // Refresh history
+            } else {
+                throw new Error(data.error || 'Failed to generate custom video');
+            }
+        } catch (error) {
+            console.error('Custom video generation error:', error);
+            this.showToast(`Custom video generation failed: ${error.message}`, 'error');
+        } finally {
+            this.setVideoGenerationLoading(false, customVideoBtn, generateText, generateLoading);
+        }
+    }
+
+    regenerateVideo() {
+        // Use the same settings as the last generation
+        const prompt = document.getElementById('video-prompt')?.value?.trim();
+        if (prompt) {
+            this.generateCustomVideo();
+        } else {
+            this.generateQuickVideo();
+        }
+    }
+
+    displayVideoResult(videoData, workflow, metadata) {
+        const resultsSection = document.getElementById('video-results');
+        if (!resultsSection) return;
+
+        // Show results section
+        resultsSection.style.display = 'block';
+
+        // Update video info
+        const artistSpan = document.getElementById('result-video-artist');
+        const durationSpan = document.getElementById('result-video-duration');
+        const workflowSpan = document.getElementById('result-video-workflow');
+
+        if (artistSpan) artistSpan.textContent = `🎤 ${videoData.artist || 'Unknown'}`;
+        if (durationSpan) durationSpan.textContent = `⏱️ ${videoData.duration || 30}s`;
+        if (workflowSpan) workflowSpan.textContent = `🔄 ${workflow || 'simple'}`;
+
+        // Update video preview
+        const videoTitle = document.getElementById('video-title');
+        const videoSubtitle = document.getElementById('video-subtitle');
+
+        if (videoTitle) videoTitle.textContent = `${videoData.artist || 'Sample Artist'} Video`;
+        if (videoSubtitle) videoSubtitle.textContent = `${videoData.duration || 30}s • ${workflow || 'simple'} workflow`;
+
+        // Update video details
+        document.getElementById('detail-artist').textContent = videoData.artist || 'Unknown';
+        document.getElementById('detail-duration').textContent = `${videoData.duration || 30} seconds`;
+        document.getElementById('detail-style').textContent = videoData.metadata?.style || 'classic';
+        document.getElementById('detail-workflow').textContent = videoData.workflow || workflow || 'simple';
+        document.getElementById('detail-created').textContent = new Date().toLocaleString();
+
+        // Enable action buttons (mock for now)
+        const downloadBtn = document.getElementById('download-video');
+        const shareBtn = document.getElementById('share-video');
+
+        if (downloadBtn) {
+            downloadBtn.disabled = videoData.mock !== false; // Enable only for real videos
+            downloadBtn.title = videoData.mock ? 'Download not available for mock videos' : 'Download video file';
+        }
+
+        if (shareBtn) {
+            shareBtn.disabled = videoData.mock !== false; // Enable only for real videos
+            shareBtn.title = videoData.mock ? 'Share not available for mock videos' : 'Share video';
+        }
+
+        // Scroll to results
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async loadVideoHistory() {
+        try {
+            const response = await fetch('/api/video/history');
+            const data = await response.json();
+
+            const historyContainer = document.getElementById('video-history');
+            if (!historyContainer) return;
+
+            if (data.success && data.videos.length > 0) {
+                historyContainer.innerHTML = '';
+                
+                data.videos.forEach(video => {
+                    const videoItem = document.createElement('div');
+                    videoItem.className = 'history-item';
+                    videoItem.innerHTML = `
+                        <div class="history-video">
+                            <div class="history-icon">🎬</div>
+                            <div class="history-details">
+                                <div class="history-filename">${video.filename}</div>
+                                <div class="history-date">${new Date(video.created).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `;
+                    historyContainer.appendChild(videoItem);
+                });
+            } else {
+                historyContainer.innerHTML = `
+                    <div class="history-empty">
+                        <p>No videos generated yet. Create your first video above!</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading video history:', error);
+            this.showToast('Failed to load video history', 'warning');
+        }
+    }
+
+    async cleanupVideoFiles() {
+        try {
+            const response = await fetch('/api/video/cleanup', {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showToast('Video cleanup completed successfully', 'success');
+            } else {
+                throw new Error(data.error || 'Cleanup failed');
+            }
+        } catch (error) {
+            console.error('Cleanup error:', error);
+            this.showToast(`Cleanup failed: ${error.message}`, 'error');
+        }
+    }
+
+    setVideoGenerationLoading(loading, button, textElement, loadingElement) {
+        if (button) {
+            button.disabled = loading;
+        }
+
+        if (textElement) {
+            textElement.style.display = loading ? 'none' : 'inline';
+        }
+
+        if (loadingElement) {
+            loadingElement.style.display = loading ? 'inline' : 'none';
+        }
     }
 }
 

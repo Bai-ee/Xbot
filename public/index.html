@@ -19,6 +19,7 @@
             <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
             <button class="tab-btn" data-tab="chat">🤖 AI Assistant</button>
             <button class="tab-btn" data-tab="multi-agent">🚀 Multi-Agent</button>
+            <button class="tab-btn" data-tab="video">🎬 Video Generation</button>
         </div>
 
         <!-- Queue Tab -->
@@ -341,6 +342,178 @@
                             <div class="agent-description">Recommends optimal posting times and frequency</div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Generation Tab -->
+        <div class="tab-content" id="video-tab" style="display: none;">
+            <div class="video-generation-interface">
+                <div class="video-header">
+                    <h3>🎬 Arweave Video Generation</h3>
+                    <p>Create professional videos using Arweave audio and AI-powered visuals</p>
+                </div>
+
+                <!-- Quick Video Generation -->
+                <div class="quick-video-section">
+                    <h4>⚡ Quick Video Generation</h4>
+                    <div class="quick-video-card">
+                        <p>Generate a "Hello World" video with default settings</p>
+                        <button id="generate-quick-video" class="btn btn-primary">
+                            <span class="generate-text">🚀 Generate Quick Video</span>
+                            <span class="generate-loading" style="display: none;">Generating...</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Custom Video Generation -->
+                <div class="custom-video-section">
+                    <h4>🎨 Custom Video Generation</h4>
+                    
+                    <!-- Video Configuration -->
+                    <div class="video-config">
+                        <div class="config-row">
+                            <div class="config-item">
+                                <label for="video-artist">🎤 Artist:</label>
+                                <select id="video-artist">
+                                    <option value="random">🎲 Random Artist</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label for="video-duration">⏱️ Duration:</label>
+                                <select id="video-duration">
+                                    <option value="15">15 seconds</option>
+                                    <option value="30" selected>30 seconds</option>
+                                    <option value="45">45 seconds</option>
+                                    <option value="60">60 seconds</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label for="video-style">🎨 Style:</label>
+                                <select id="video-style">
+                                    <option value="classic" selected>Classic</option>
+                                    <option value="modern">Modern</option>
+                                    <option value="minimal">Minimal</option>
+                                    <option value="enhanced">Enhanced (AI)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Video Prompt -->
+                    <div class="video-prompt-section">
+                        <label for="video-prompt">💭 Describe your video:</label>
+                        <textarea 
+                            id="video-prompt" 
+                            placeholder="Examples:&#10;• Create an electronic music video with neon visuals&#10;• Generate a minimal techno video with abstract backgrounds&#10;• Make a DJ mix video with dynamic layouts&#10;• Create a promotional video for my upcoming set"
+                            rows="3"></textarea>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <div class="video-generate-section">
+                        <button id="generate-custom-video" class="btn btn-accent">
+                            <span class="generate-text">🎬 Generate Custom Video</span>
+                            <span class="generate-loading" style="display: none;">Processing workflow...</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Video Results -->
+                <div class="video-results" id="video-results" style="display: none;">
+                    <div class="results-header">
+                        <h4>🎥 Generated Video</h4>
+                        <div class="video-info" id="video-info">
+                            <span class="video-artist" id="result-video-artist"></span>
+                            <span class="video-duration" id="result-video-duration"></span>
+                            <span class="video-workflow" id="result-video-workflow"></span>
+                        </div>
+                    </div>
+
+                    <div class="video-content">
+                        <!-- Video Preview (Mock) -->
+                        <div class="video-preview">
+                            <div class="video-placeholder" id="video-placeholder">
+                                <div class="video-icon">🎬</div>
+                                <div class="video-title" id="video-title">Video Preview</div>
+                                <div class="video-subtitle" id="video-subtitle">Generated video will appear here</div>
+                            </div>
+                        </div>
+
+                        <!-- Video Details -->
+                        <div class="video-details" id="video-details">
+                            <div class="detail-item">
+                                <strong>Artist:</strong> <span id="detail-artist">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Duration:</strong> <span id="detail-duration">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Style:</strong> <span id="detail-style">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Workflow:</strong> <span id="detail-workflow">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Created:</strong> <span id="detail-created">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="video-actions">
+                            <button id="download-video" class="btn btn-primary" disabled>
+                                💾 Download Video
+                            </button>
+                            <button id="share-video" class="btn btn-secondary" disabled>
+                                📤 Share Video
+                            </button>
+                            <button id="regenerate-video" class="btn btn-accent">
+                                🔄 Generate Another
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video History -->
+                <div class="video-history-section">
+                    <div class="history-header">
+                        <h4>📚 Video History</h4>
+                        <button id="refresh-video-history" class="btn btn-secondary btn-small">🔄 Refresh</button>
+                    </div>
+                    <div class="video-history" id="video-history">
+                        <div class="history-empty">
+                            <p>No videos generated yet. Create your first video above!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Available Artists Info -->
+                <div class="available-artists-info">
+                    <h4>🎭 Available Artists</h4>
+                    <div class="artists-grid" id="artists-grid">
+                        <div class="artist-card">
+                            <div class="artist-name">Loading artists...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video System Status -->
+                <div class="video-system-status">
+                    <h4>⚙️ System Status</h4>
+                    <div class="system-stats">
+                        <div class="system-stat">
+                            <span class="stat-label">Video Agent:</span>
+                            <span class="stat-value status-operational">✅ Ready</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">Arweave Network:</span>
+                            <span class="stat-value status-operational">🌐 Connected</span>
+                        </div>
+                        <div class="system-stat">
+                            <span class="stat-label">AI Processing:</span>
+                            <span class="stat-value status-operational">🤖 Available</span>
+                        </div>
+                    </div>
+                    <button id="cleanup-video-files" class="btn btn-secondary btn-small">🧹 Cleanup Temp Files</button>
                 </div>
             </div>
         </div>

@@ -89,6 +89,14 @@ class MultiAgentOrchestrator {
       suggestedAgents.push('scheduler');
     }
 
+    // Check for video generation requests
+    if (inputLower.includes('video') || inputLower.includes('arweave') || inputLower.includes('visual') || 
+        inputLower.includes('clip') || inputLower.includes('generate video') || inputLower.includes('create video')) {
+      complexity += 2;
+      suggestedAgents.push('video_generator');
+      workflow = 'video_generation';
+    }
+
     // Check for comprehensive content strategy requests
     if (inputLower.includes('strategy') || inputLower.includes('campaign') || inputLower.includes('comprehensive')) {
       complexity += 2;
@@ -117,6 +125,13 @@ class MultiAgentOrchestrator {
     } else if (complexity >= 3) {
       workflow = 'moderate';
       requiresMultiAgent = true;
+    }
+
+    // Special handling for video generation
+    if (suggestedAgents.includes('video_generator')) {
+      workflow = 'video_generation';
+      // Video generation can be complex, but handled by single specialized agent
+      requiresMultiAgent = false;
     }
 
     // Ensure we have at least one agent if none were identified
@@ -226,7 +241,8 @@ class MultiAgentOrchestrator {
       'content_creator',    // Second: create content based on trends
       'hashtag_specialist', // Third: optimize hashtags for the content
       'engagement_optimizer', // Fourth: optimize for engagement
-      'scheduler'           // Fifth: recommend timing
+      'scheduler',          // Fifth: recommend timing
+      'video_generator'     // Sixth: generate video content if requested
     ];
 
     for (const agentType of executionOrder) {
@@ -400,6 +416,11 @@ class MultiAgentOrchestrator {
       scheduler: {
         schedulingAdvice: result.recommendations,
         optimalTimes: result.optimalTimes || []
+      },
+      video_generator: {
+        videoPath: result.videoPath,
+        videoWorkflow: result.workflow,
+        artist: result.metadata?.artist
       }
     };
 
