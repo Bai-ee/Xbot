@@ -2,9 +2,11 @@
 builder = "nixpacks"
 
 [deploy]
-healthcheckPath = "/health"
+startCommand = "npm start"
+healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
 
-[environments.production]
-PORT = "8080" 
+[env]
+NODE_ENV = "production" 
