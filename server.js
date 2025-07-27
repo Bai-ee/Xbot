@@ -416,8 +416,8 @@ const ANALYTICS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours for long-term cachi
 let lastAnalyticsCall = 0;
 const ANALYTICS_COOLDOWN = 30 * 1000; // 30 seconds between calls
 let rateLimitInfo = {
-  remaining: null,
-  limit: null,
+  remaining: 25, // Default to full quota
+  limit: 25,
   resetTime: null,
   lastUpdated: null
 };
@@ -434,12 +434,18 @@ function shouldAutoRefresh() {
 
 function updateRateLimitInfo(headers) {
   if (headers) {
-    rateLimitInfo = {
+    const newRateLimitInfo = {
       remaining: parseInt(headers['x-user-limit-24hour-remaining']) || 0,
       limit: parseInt(headers['x-user-limit-24hour-limit']) || 25,
       resetTime: parseInt(headers['x-user-limit-24hour-reset']) * 1000 || null,
       lastUpdated: Date.now()
     };
+    
+    // Only update if we got valid data
+    if (newRateLimitInfo.remaining !== undefined && newRateLimitInfo.limit !== undefined) {
+      rateLimitInfo = newRateLimitInfo;
+      console.log(`Rate limit updated: ${rateLimitInfo.remaining}/${rateLimitInfo.limit} remaining`);
+    }
   }
 }
 
@@ -455,7 +461,8 @@ app.get('/api/rate-limit', (req, res) => {
     timeUntilResetHours: timeUntilReset ? Math.ceil(timeUntilReset / (60 * 60 * 1000)) : null,
     lastUpdated: rateLimitInfo.lastUpdated,
     canRefresh: rateLimitInfo.remaining > 0,
-    autoRefreshAvailable: shouldAutoRefresh()
+    autoRefreshAvailable: shouldAutoRefresh(),
+    status: rateLimitInfo.remaining > 0 ? 'available' : 'rate_limited'
   });
 });
 
@@ -464,10 +471,14 @@ app.post('/api/refresh-analytics', async (req, res) => {
   try {
     // Check rate limits first
     if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining <= 0) {
+      const timeUntilReset = rateLimitInfo.resetTime ? Math.max(0, rateLimitInfo.resetTime - Date.now()) : null;
+      const hoursUntilReset = timeUntilReset ? Math.ceil(timeUntilReset / (60 * 60 * 1000)) : 'unknown';
+      
       return res.status(429).json({
         error: 'Rate limit exceeded',
-        message: `No analytics refreshes remaining (0/${rateLimitInfo.limit})`,
+        message: `No analytics refreshes remaining (0/${rateLimitInfo.limit}). Resets in ${hoursUntilReset} hours.`,
         resetTime: rateLimitInfo.resetTime,
+        rate_limit: rateLimitInfo,
         cached_data: analyticsCache.analytics?.data || null
       });
     }
@@ -489,7 +500,8 @@ app.post('/api/refresh-analytics', async (req, res) => {
         success: true,
         data: analyticsData,
         rate_limit: rateLimitInfo,
-        refreshed_at: new Date().toISOString()
+        refreshed_at: new Date().toISOString(),
+        message: `Analytics refreshed successfully. ${rateLimitInfo.remaining}/${rateLimitInfo.limit} refreshes remaining.`
       });
     } catch (error) {
       // Restore old cache if fetch failed
@@ -506,9 +518,15 @@ app.post('/api/refresh-analytics', async (req, res) => {
       updateRateLimitInfo(error.headers);
     }
     
+    const isRateLimited = error.code === 429;
+    const timeUntilReset = rateLimitInfo.resetTime ? Math.max(0, rateLimitInfo.resetTime - Date.now()) : null;
+    const hoursUntilReset = timeUntilReset ? Math.ceil(timeUntilReset / (60 * 60 * 1000)) : 'unknown';
+    
     res.status(error.code === 429 ? 429 : 500).json({
-      error: error.code === 429 ? 'Rate limited' : 'Refresh failed',
-      message: error.message,
+      error: isRateLimited ? 'Rate limited' : 'Refresh failed',
+      message: isRateLimited 
+        ? `Rate limit exceeded. Resets in ${hoursUntilReset} hours.`
+        : error.message,
       rate_limit: rateLimitInfo,
       cached_data: analyticsCache.analytics?.data || null
     });
@@ -891,13 +909,25 @@ app.get('/api/analytics', async (req, res) => {
       });
     }
 
-    // No cached data available - return fallback
-    console.log('No cached analytics data available, returning fallback');
+    // No cached data available - return comprehensive fallback
+    console.log('No cached analytics data available, returning comprehensive fallback');
+    
+    const now = Date.now();
+    const timeUntilReset = rateLimitInfo.resetTime ? Math.max(0, rateLimitInfo.resetTime - now) : null;
+    const hoursUntilReset = timeUntilReset ? Math.ceil(timeUntilReset / (60 * 60 * 1000)) : null;
+    
     const fallbackData = {
       profile: { 
-        public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 },
-        name: 'Profile Unavailable',
-        username: 'unavailable'
+        public_metrics: { 
+          followers_count: 0, 
+          following_count: 0, 
+          tweet_count: 0,
+          listed_count: 0
+        },
+        name: 'Data Unavailable',
+        username: 'rate_limited',
+        description: 'Profile data temporarily unavailable due to API rate limits',
+        created_at: new Date().toISOString()
       },
       recent_engagement: {
         total_likes: 0,
@@ -911,9 +941,22 @@ app.get('/api/analytics', async (req, res) => {
       cache_info: {
         from_cache: false,
         no_data: true,
-        message: 'No analytics data available - manual refresh required'
+        message: rateLimitInfo.remaining <= 0 
+          ? `Rate limited: ${rateLimitInfo.remaining}/${rateLimitInfo.limit} refreshes remaining. Resets in ${hoursUntilReset || 'unknown'} hours.`
+          : 'No analytics data available - try refreshing manually',
+        rate_limited: rateLimitInfo.remaining <= 0,
+        refreshes_remaining: rateLimitInfo.remaining,
+        total_refreshes: rateLimitInfo.limit,
+        reset_time: rateLimitInfo.resetTime,
+        hours_until_reset: hoursUntilReset
       },
-      rate_limit: rateLimitInfo
+      rate_limit: {
+        ...rateLimitInfo,
+        status: rateLimitInfo.remaining <= 0 ? 'rate_limited' : 'available',
+        status_message: rateLimitInfo.remaining <= 0 
+          ? `Rate limited - ${hoursUntilReset || 'unknown'} hours until reset`
+          : `${rateLimitInfo.remaining}/${rateLimitInfo.limit} refreshes available`
+      }
     };
     
     res.json(fallbackData);

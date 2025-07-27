@@ -781,10 +781,97 @@ body {
 }
 
 .cache-status.error {
-  color: var(--error-color);
+  color: var(--danger-color);
 }
 
 .last-updated {
   font-size: 0.85rem;
   opacity: 0.8;
+} 
+
+/* Rate limit indicators and error states */
+.rate-limit-info {
+    transition: color 0.3s ease;
+}
+
+.rate-limit-info.rate-limited {
+    color: #e74c3c !important;
+}
+
+.rate-limit-info.warning {
+    color: #f39c12 !important;
+}
+
+.rate-limit-info.available {
+    color: #27ae60 !important;
+}
+
+.refresh-btn.disabled {
+    background-color: #95a5a6 !important;
+    cursor: not-allowed !important;
+}
+
+.cache-status.error {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.cache-status.from-cache {
+    color: #3498db;
+}
+
+.cache-status.fresh {
+    color: #27ae60;
+    font-weight: bold;
+}
+
+/* Analytics stats when rate limited */
+.analytics-grid .stat-card[title*="Unavailable"] {
+    opacity: 0.6;
+    border-left: 3px solid #e74c3c;
+}
+
+.analytics-grid .stat-card[title*="Unavailable"] .stat-value {
+    color: #e74c3c;
+}
+
+/* Profile stats when rate limited */
+.overview-stats .stat-item[title*="Unavailable"] {
+    opacity: 0.6;
+}
+
+.overview-stats .stat-item[title*="Unavailable"] .stat-number {
+    color: #e74c3c;
+}
+
+/* Rate limit reset timer styling */
+.rate-limit-reset {
+    font-size: 0.85em;
+    margin-left: 8px;
+    transition: color 0.3s ease;
+}
+
+/* Loading states and messages */
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+.loading.error {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Better button states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn.disabled {
+    background-color: #bdc3c7 !important;
+    color: #7f8c8d !important;
 } 

@@ -211,24 +211,53 @@ class TwitterBotDashboard {
         const resetEl = document.getElementById('rate-limit-reset');
         const refreshBtn = document.getElementById('refresh-analytics');
 
-        if (remainingEl) remainingEl.textContent = rateLimitData.remaining || 0;
-        if (totalEl) totalEl.textContent = rateLimitData.limit || 25;
+        const remaining = rateLimitData.remaining || 0;
+        const limit = rateLimitData.limit || 25;
+        const isRateLimited = remaining <= 0;
 
-        // Update reset time
-        if (resetEl && rateLimitData.timeUntilResetHours) {
-            resetEl.textContent = `Resets in ${rateLimitData.timeUntilResetHours}h`;
-        } else if (resetEl) {
-            resetEl.textContent = '';
+        if (remainingEl) remainingEl.textContent = remaining;
+        if (totalEl) totalEl.textContent = limit;
+
+        // Update reset time with better formatting
+        if (resetEl) {
+            if (rateLimitData.timeUntilResetHours && isRateLimited) {
+                resetEl.textContent = `Resets in ${rateLimitData.timeUntilResetHours}h`;
+                resetEl.style.color = '#e74c3c'; // Red for rate limited
+            } else if (rateLimitData.timeUntilResetHours) {
+                resetEl.textContent = `Resets in ${rateLimitData.timeUntilResetHours}h`;
+                resetEl.style.color = '#95a5a6'; // Gray for normal
+            } else {
+                resetEl.textContent = '';
+            }
         }
 
-        // Update refresh button state
+        // Update refresh button state with better messaging
         if (refreshBtn) {
-            if (rateLimitData.remaining <= 0) {
+            if (isRateLimited) {
                 refreshBtn.disabled = true;
-                refreshBtn.title = `Rate limit reached. Resets in ${rateLimitData.timeUntilResetHours || '?'}h`;
+                refreshBtn.textContent = '🚫 Rate Limited';
+                refreshBtn.title = `Rate limit reached (0/${limit}). Resets in ${rateLimitData.timeUntilResetHours || '?'}h`;
+                refreshBtn.classList.add('disabled');
             } else {
                 refreshBtn.disabled = false;
-                refreshBtn.title = 'Manually refresh analytics data';
+                refreshBtn.textContent = '🔄 Refresh Analytics';
+                refreshBtn.title = `Manually refresh analytics data (${remaining}/${limit} remaining)`;
+                refreshBtn.classList.remove('disabled');
+            }
+        }
+
+        // Update rate limit info display colors
+        const rateLimitInfoEl = document.getElementById('rate-limit-info');
+        if (rateLimitInfoEl) {
+            if (isRateLimited) {
+                rateLimitInfoEl.style.color = '#e74c3c'; // Red
+                rateLimitInfoEl.title = 'Rate limit exceeded - analytics unavailable until reset';
+            } else if (remaining <= 5) {
+                rateLimitInfoEl.style.color = '#f39c12'; // Orange warning
+                rateLimitInfoEl.title = `Low on refreshes - ${remaining} remaining`;
+            } else {
+                rateLimitInfoEl.style.color = '#27ae60'; // Green
+                rateLimitInfoEl.title = `${remaining} analytics refreshes available`;
             }
         }
     }
@@ -240,28 +269,48 @@ class TwitterBotDashboard {
         if (!cacheStatusEl || !lastUpdatedEl || !analytics) return;
 
         const cacheInfo = analytics.cache_info || {};
+        const rateLimit = analytics.rate_limit || {};
         
-        // Update cache status
+        // Update cache status with rich information
         cacheStatusEl.className = 'cache-status';
-        if (cacheInfo.from_cache) {
-            cacheStatusEl.textContent = `📦 Cached data (${cacheInfo.cache_age_hours || 0}h old)`;
-            cacheStatusEl.classList.add('from-cache');
-        } else if (cacheInfo.refreshed_at) {
-            cacheStatusEl.textContent = '✨ Fresh data';
-            cacheStatusEl.classList.add('fresh');
-        } else if (cacheInfo.no_data) {
-            cacheStatusEl.textContent = '⚠️ No data available';
+        
+        if (cacheInfo.rate_limited) {
+            // Rate limited - show prominent message
+            cacheStatusEl.textContent = `🚫 Rate Limited (${cacheInfo.refreshes_remaining || 0}/${cacheInfo.total_refreshes || 25} refreshes)`;
             cacheStatusEl.classList.add('error');
-        } else {
-            cacheStatusEl.textContent = '📊 Analytics loaded';
-        }
-
-        // Update last updated time
-        const lastUpdated = cacheInfo.refreshed_at || cacheInfo.last_cached;
-        if (lastUpdated) {
-            const updateTime = new Date(lastUpdated);
+            
+            // Show detailed message in last updated
+            if (cacheInfo.hours_until_reset) {
+                lastUpdatedEl.textContent = `⏰ Resets in ${cacheInfo.hours_until_reset} hours`;
+            } else {
+                lastUpdatedEl.textContent = '⏰ Reset time unknown';
+            }
+        } else if (cacheInfo.no_data) {
+            // No data available but not rate limited
+            cacheStatusEl.textContent = `⚠️ No data - ${cacheInfo.refreshes_remaining || 0}/${cacheInfo.total_refreshes || 25} refreshes available`;
+            cacheStatusEl.classList.add('error');
+            lastUpdatedEl.textContent = 'Try manually refreshing analytics';
+        } else if (cacheInfo.from_cache) {
+            // Cached data
+            const ageHours = cacheInfo.cache_age_hours || 0;
+            cacheStatusEl.textContent = `📦 Cached data (${ageHours}h old)`;
+            cacheStatusEl.classList.add('from-cache');
+            
+            const lastUpdated = cacheInfo.last_cached;
+            if (lastUpdated) {
+                const updateTime = new Date(lastUpdated);
+                lastUpdatedEl.textContent = `Cached: ${this.formatDate(updateTime)}`;
+            }
+        } else if (cacheInfo.refreshed_at) {
+            // Fresh data
+            cacheStatusEl.textContent = `✨ Fresh data (${rateLimit.remaining || 0}/${rateLimit.limit || 25} refreshes left)`;
+            cacheStatusEl.classList.add('fresh');
+            
+            const updateTime = new Date(cacheInfo.refreshed_at);
             lastUpdatedEl.textContent = `Updated: ${this.formatDate(updateTime)}`;
         } else {
+            // Default state
+            cacheStatusEl.textContent = '📊 Analytics loaded';
             lastUpdatedEl.textContent = '';
         }
     }
@@ -296,35 +345,92 @@ class TwitterBotDashboard {
     renderAnalytics(analytics) {
         if (!analytics) return;
 
-        // Handle profile metrics
+        // Handle profile metrics - show clear messaging for rate limited data
         const profile = analytics.profile || {};
         const profileMetrics = profile.public_metrics || {};
         const engagement = analytics.recent_engagement || {};
+        const cacheInfo = analytics.cache_info || {};
         
-        this.updateFollowersData({
-            followers_count: profileMetrics.followers_count || 0,
-            following_count: profileMetrics.following_count || 0,
-            tweet_count: profileMetrics.tweet_count || 0,
-            listed_count: profileMetrics.listed_count || 0,
-            username: profile.username || 'N/A',
-            name: profile.name || 'N/A',
-            total_likes: engagement.total_likes || 0  // Use recent engagement for total likes display
-        });
+        // If rate limited, show special messaging
+        const isRateLimited = cacheInfo.rate_limited || false;
+        const hasNoData = cacheInfo.no_data || false;
+        
+        if (isRateLimited || hasNoData) {
+            // Update profile display with rate limit messaging
+            this.updateFollowersData({
+                followers_count: profileMetrics.followers_count || 0,
+                following_count: profileMetrics.following_count || 0,
+                tweet_count: profileMetrics.tweet_count || 0,
+                listed_count: profileMetrics.listed_count || 0,
+                username: isRateLimited ? 'Rate Limited' : (profile.username || 'N/A'),
+                name: isRateLimited ? 'Data Unavailable' : (profile.name || 'N/A'),
+                total_likes: engagement.total_likes || 0,
+                rate_limited: isRateLimited
+            });
+        } else {
+            // Normal display
+            this.updateFollowersData({
+                followers_count: profileMetrics.followers_count || 0,
+                following_count: profileMetrics.following_count || 0,
+                tweet_count: profileMetrics.tweet_count || 0,
+                listed_count: profileMetrics.listed_count || 0,
+                username: profile.username || 'N/A',
+                name: profile.name || 'N/A',
+                total_likes: engagement.total_likes || 0
+            });
+        }
 
-        // Update recent engagement stats
+        // Update recent engagement stats with special messaging for rate limited
         const recentLikesEl = document.getElementById('recent-likes');
         const recentRetweetsEl = document.getElementById('recent-retweets');
         const recentRepliesEl = document.getElementById('recent-replies');
         const avgLikesEl = document.getElementById('avg-likes');
 
-        if (recentLikesEl) recentLikesEl.textContent = this.formatNumber(engagement.total_likes || 0);
-        if (recentRetweetsEl) recentRetweetsEl.textContent = this.formatNumber(engagement.total_retweets || 0);
-        if (recentRepliesEl) recentRepliesEl.textContent = this.formatNumber(engagement.total_replies || 0);
-        if (avgLikesEl) avgLikesEl.textContent = this.formatNumber(engagement.avg_likes_per_tweet || 0);
+        if (isRateLimited) {
+            // Show rate limited message in engagement stats
+            if (recentLikesEl) {
+                recentLikesEl.textContent = '-';
+                recentLikesEl.title = 'Unavailable due to rate limits';
+            }
+            if (recentRetweetsEl) {
+                recentRetweetsEl.textContent = '-';
+                recentRetweetsEl.title = 'Unavailable due to rate limits';
+            }
+            if (recentRepliesEl) {
+                recentRepliesEl.textContent = '-';
+                recentRepliesEl.title = 'Unavailable due to rate limits';
+            }
+            if (avgLikesEl) {
+                avgLikesEl.textContent = '-';
+                avgLikesEl.title = 'Unavailable due to rate limits';
+            }
+        } else {
+            // Normal display
+            if (recentLikesEl) {
+                recentLikesEl.textContent = this.formatNumber(engagement.total_likes || 0);
+                recentLikesEl.title = '';
+            }
+            if (recentRetweetsEl) {
+                recentRetweetsEl.textContent = this.formatNumber(engagement.total_retweets || 0);
+                recentRetweetsEl.title = '';
+            }
+            if (recentRepliesEl) {
+                recentRepliesEl.textContent = this.formatNumber(engagement.total_replies || 0);
+                recentRepliesEl.title = '';
+            }
+            if (avgLikesEl) {
+                avgLikesEl.textContent = this.formatNumber(engagement.avg_likes_per_tweet || 0);
+                avgLikesEl.title = '';
+            }
+        }
 
-        // Handle recent tweets
+        // Handle recent tweets - show message if none due to rate limits
         const recentTweets = analytics.recent_tweets || [];
-        this.renderRecentTweets(recentTweets);
+        if (isRateLimited && recentTweets.length === 0) {
+            this.renderRecentTweets([], 'Recent tweets unavailable due to API rate limits');
+        } else {
+            this.renderRecentTweets(recentTweets);
+        }
 
         // Update rate limit info if available
         if (analytics.rate_limit) {
@@ -339,26 +445,34 @@ class TwitterBotDashboard {
         const totalTweetsCountEl = document.getElementById('total-tweets-count');
         const totalLikesCountEl = document.getElementById('total-likes-count');
 
-        if (followersCountEl) followersCountEl.textContent = this.formatNumber(followers.followers_count || 0);
-        if (followingCountEl) followingCountEl.textContent = this.formatNumber(followers.following_count || 0);
-        if (totalTweetsCountEl) totalTweetsCountEl.textContent = this.formatNumber(followers.tweet_count || 0);
-        
-        // For total likes, we'll use recent engagement data (since Twitter doesn't provide total likes in profile)
-        if (totalLikesCountEl) {
-            // This will be updated by renderAnalytics when engagement data is available
-            totalLikesCountEl.textContent = this.formatNumber(followers.total_likes || 0);
-        }
+        const isRateLimited = followers.rate_limited || false;
+        const displayValue = isRateLimited ? '-' : (value) => this.formatNumber(value || 0);
 
-        // Update profile info (if we have it)
-        const profileNameEl = document.getElementById('profile-name');
-        const profileUsernameEl = document.getElementById('profile-username');
-        
-        if (profileNameEl && followers.name) profileNameEl.textContent = followers.name;
-        if (profileUsernameEl && followers.username) profileUsernameEl.textContent = '@' + followers.username;
+        if (followersCountEl) {
+            followersCountEl.textContent = isRateLimited ? '-' : this.formatNumber(followers.followers_count || 0);
+            followersCountEl.title = isRateLimited ? 'Unavailable due to rate limits' : '';
+        }
+        if (followingCountEl) {
+            followingCountEl.textContent = isRateLimited ? '-' : this.formatNumber(followers.following_count || 0);
+            followingCountEl.title = isRateLimited ? 'Unavailable due to rate limits' : '';
+        }
+        if (totalTweetsCountEl) {
+            totalTweetsCountEl.textContent = isRateLimited ? '-' : this.formatNumber(followers.tweet_count || 0);
+            totalTweetsCountEl.title = isRateLimited ? 'Unavailable due to rate limits' : '';
+        }
+        if (totalLikesCountEl) {
+            totalLikesCountEl.textContent = isRateLimited ? '-' : this.formatNumber(followers.total_likes || 0);
+            totalLikesCountEl.title = isRateLimited ? 'Unavailable due to rate limits' : '';
+        }
     }
 
-    renderRecentTweets(tweets) {
+    renderRecentTweets(tweets, message = '') {
         const container = document.getElementById('recent-tweets-list');
+        if (message) {
+            container.innerHTML = `<div class="loading">${message}</div>`;
+            return;
+        }
+
         if (!tweets || tweets.length === 0) {
             container.innerHTML = '<div class="loading">No recent tweets available</div>';
             return;
