@@ -151,3 +151,4 @@ The bot includes a full REST API:
 **Tweet Approval**: Full control over your content  
 
 Happy DJing! 🎧✨# Xbot
+Railway deployment trigger: Updated OPENAI_API_KEY Sat Jul 26 22:51:48 CDT 2025
