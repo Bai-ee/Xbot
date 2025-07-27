@@ -1,4 +1,8 @@
-# 🎵 Creative Tech DJ Twitter Bot with Web Dashboard
+# 🎵 Creative Tech DJ Twitter Bot
+
+*A sophisticated Twitter automation dashboard with AI assistant capabilities*
+
+<!-- Railway deployment trigger: OpenAI integration update -->
 
 Automated content engine for DJs and Creative-Tech users using X Premium+ tools. Features a modern web dashboard for tweet approval and monitoring before posting.
 
