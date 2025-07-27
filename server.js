@@ -412,9 +412,218 @@ app.post('/api/save-draft', async (req, res) => {
 
 // Rate limiting protection for analytics
 let analyticsCache = {};
-const ANALYTICS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const ANALYTICS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours for long-term caching
 let lastAnalyticsCall = 0;
 const ANALYTICS_COOLDOWN = 30 * 1000; // 30 seconds between calls
+let rateLimitInfo = {
+  remaining: null,
+  limit: null,
+  resetTime: null,
+  lastUpdated: null
+};
+
+// Auto-refresh analytics once per day (at 9 AM UTC)
+let lastAutoRefresh = 0;
+const AUTO_REFRESH_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+function shouldAutoRefresh() {
+  const now = Date.now();
+  const timeSinceLastAuto = now - lastAutoRefresh;
+  return timeSinceLastAuto >= AUTO_REFRESH_INTERVAL;
+}
+
+function updateRateLimitInfo(headers) {
+  if (headers) {
+    rateLimitInfo = {
+      remaining: parseInt(headers['x-user-limit-24hour-remaining']) || 0,
+      limit: parseInt(headers['x-user-limit-24hour-limit']) || 25,
+      resetTime: parseInt(headers['x-user-limit-24hour-reset']) * 1000 || null,
+      lastUpdated: Date.now()
+    };
+  }
+}
+
+// Get rate limit status
+app.get('/api/rate-limit', (req, res) => {
+  const now = Date.now();
+  const timeUntilReset = rateLimitInfo.resetTime ? Math.max(0, rateLimitInfo.resetTime - now) : null;
+  
+  res.json({
+    remaining: rateLimitInfo.remaining,
+    limit: rateLimitInfo.limit,
+    resetTime: rateLimitInfo.resetTime,
+    timeUntilResetHours: timeUntilReset ? Math.ceil(timeUntilReset / (60 * 60 * 1000)) : null,
+    lastUpdated: rateLimitInfo.lastUpdated,
+    canRefresh: rateLimitInfo.remaining > 0,
+    autoRefreshAvailable: shouldAutoRefresh()
+  });
+});
+
+// Manual analytics refresh endpoint
+app.post('/api/refresh-analytics', async (req, res) => {
+  try {
+    // Check rate limits first
+    if (rateLimitInfo.remaining !== null && rateLimitInfo.remaining <= 0) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded',
+        message: `No analytics refreshes remaining (0/${rateLimitInfo.limit})`,
+        resetTime: rateLimitInfo.resetTime,
+        cached_data: analyticsCache.analytics?.data || null
+      });
+    }
+
+    console.log('Manual analytics refresh requested...');
+    
+    // Force fresh fetch by clearing cache temporarily
+    const oldCache = analyticsCache.analytics;
+    delete analyticsCache.analytics;
+    
+    try {
+      // Fetch fresh analytics
+      const analyticsData = await fetchFreshAnalytics();
+      
+      // Update auto-refresh timestamp if this was successful
+      lastAutoRefresh = Date.now();
+      
+      res.json({
+        success: true,
+        data: analyticsData,
+        rate_limit: rateLimitInfo,
+        refreshed_at: new Date().toISOString()
+      });
+    } catch (error) {
+      // Restore old cache if fetch failed
+      if (oldCache) {
+        analyticsCache.analytics = oldCache;
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Manual refresh failed:', error);
+    
+    // Update rate limit info from error if available
+    if (error.headers) {
+      updateRateLimitInfo(error.headers);
+    }
+    
+    res.status(error.code === 429 ? 429 : 500).json({
+      error: error.code === 429 ? 'Rate limited' : 'Refresh failed',
+      message: error.message,
+      rate_limit: rateLimitInfo,
+      cached_data: analyticsCache.analytics?.data || null
+    });
+  }
+});
+
+async function fetchFreshAnalytics() {
+  console.log('Fetching fresh analytics data...');
+  
+  // Get user profile with metrics
+  let profile = null;
+  try {
+    const profileResponse = await client.v2.me({
+      'user.fields': ['public_metrics', 'created_at', 'description', 'profile_image_url', 'username', 'name']
+    });
+    profile = profileResponse.data;
+    
+    // Update rate limit info from successful call
+    updateRateLimitInfo(profileResponse._headers);
+  } catch (profileError) {
+    console.error('Profile fetch failed:', profileError.message);
+    updateRateLimitInfo(profileError.headers);
+    
+    // Use cached profile if available
+    if (analyticsCache.profile) {
+      profile = analyticsCache.profile.data;
+      console.log('Using cached profile data');
+    } else {
+      throw profileError;
+    }
+  }
+
+  // Get recent tweets with metrics (handle rate limits gracefully)
+  let recentTweets = null;
+  let tweetsFromCache = false;
+  
+  try {
+    if (profile && profile.id) {
+      const tweetsResponse = await client.v2.userTimeline(profile.id, {
+        max_results: 10,
+        'tweet.fields': ['created_at', 'public_metrics', 'text']
+      });
+      recentTweets = tweetsResponse;
+      
+      // Update rate limit info
+      updateRateLimitInfo(tweetsResponse._headers);
+    }
+  } catch (tweetsError) {
+    console.log('Recent tweets fetch failed:', tweetsError.code === 429 ? 'Rate limited' : tweetsError.message);
+    updateRateLimitInfo(tweetsError.headers);
+    
+    // Try to use cached tweets
+    if (analyticsCache.recentTweets) {
+      recentTweets = { data: analyticsCache.recentTweets.data };
+      tweetsFromCache = true;
+      console.log('Using cached tweets data');
+    }
+  }
+
+  // Calculate total engagement from recent tweets
+  let totalLikes = 0;
+  let totalRetweets = 0;
+  let totalReplies = 0;
+  let totalQuotes = 0;
+  let tweetsAnalyzed = 0;
+
+  if (recentTweets && recentTweets.data && Array.isArray(recentTweets.data)) {
+    tweetsAnalyzed = recentTweets.data.length;
+    recentTweets.data.forEach(tweet => {
+      if (tweet && tweet.public_metrics) {
+        totalLikes += tweet.public_metrics.like_count || 0;
+        totalRetweets += tweet.public_metrics.retweet_count || 0;
+        totalReplies += tweet.public_metrics.reply_count || 0;
+        totalQuotes += tweet.public_metrics.quote_count || 0;
+      }
+    });
+  }
+
+  const analyticsData = {
+    profile: profile || { public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 } },
+    recent_engagement: {
+      total_likes: totalLikes,
+      total_retweets: totalRetweets,
+      total_replies: totalReplies,
+      total_quotes: totalQuotes,
+      tweets_analyzed: tweetsAnalyzed,
+      avg_likes_per_tweet: tweetsAnalyzed > 0 ? Math.round(totalLikes / tweetsAnalyzed) : 0
+    },
+    recent_tweets: recentTweets?.data || [],
+    cache_info: {
+      from_cache: tweetsFromCache,
+      cached_at: tweetsFromCache ? analyticsCache.recentTweets?.timestamp : null,
+      refreshed_at: new Date().toISOString()
+    },
+    rate_limit: rateLimitInfo
+  };
+
+  // Cache the results with long TTL
+  const now = Date.now();
+  lastAnalyticsCall = now;
+  analyticsCache.analytics = {
+    data: analyticsData,
+    timestamp: now
+  };
+
+  // Cache individual components
+  if (profile) {
+    analyticsCache.profile = { data: profile, timestamp: now };
+  }
+  if (recentTweets && !tweetsFromCache) {
+    analyticsCache.recentTweets = { data: recentTweets.data, timestamp: now };
+  }
+
+  return analyticsData;
+}
 
 // Get user profile data
 app.get('/api/profile', async (req, res) => {
@@ -625,119 +834,65 @@ app.get('/api/tweet/:id/metrics', async (req, res) => {
 // Get analytics dashboard data
 app.get('/api/analytics', async (req, res) => {
   try {
-    // Rate limit protection
-    const now = Date.now();
-    if (now - lastAnalyticsCall < ANALYTICS_COOLDOWN) {
-      if (analyticsCache.analytics && (now - analyticsCache.analytics.timestamp) < ANALYTICS_CACHE_TTL) {
-        console.log('Returning cached analytics data');
-        return res.json(analyticsCache.analytics.data);
-      }
-    }
-
-    console.log('Fetching fresh analytics data...');
-    
-    // Get user profile with metrics
-    let profile = null;
-    try {
-      const profileResponse = await client.v2.me({
-        'user.fields': ['public_metrics', 'created_at', 'description', 'profile_image_url']
-      });
-      profile = profileResponse.data;
-    } catch (profileError) {
-      console.error('Profile fetch failed:', profileError.message);
-      // Use cached profile if available
-      if (analyticsCache.profile) {
-        profile = analyticsCache.profile.data;
-        console.log('Using cached profile data');
-      } else {
-        throw profileError;
-      }
-    }
-
-    // Get recent tweets with metrics (handle rate limits gracefully)
-    let recentTweets = null;
-    let tweetsFromCache = false;
-    
-    try {
-      if (profile && profile.id) {
-        const tweetsResponse = await client.v2.userTimeline(profile.id, {
-          max_results: 10,
-          'tweet.fields': ['created_at', 'public_metrics', 'text']
-        });
-        recentTweets = tweetsResponse;
-      }
-    } catch (tweetsError) {
-      console.log('Recent tweets fetch failed:', tweetsError.code === 429 ? 'Rate limited' : tweetsError.message);
+    // Check if we have cached data
+    if (analyticsCache.analytics && analyticsCache.analytics.data) {
+      const cachedData = analyticsCache.analytics.data;
+      const cacheAge = Date.now() - analyticsCache.analytics.timestamp;
       
-      // Try to use cached tweets
-      if (analyticsCache.recentTweets) {
-        recentTweets = { data: analyticsCache.recentTweets.data };
-        tweetsFromCache = true;
-        console.log('Using cached tweets data');
+      // Check if we should auto-refresh (once per day)
+      const shouldAutoRefreshNow = shouldAutoRefresh() && rateLimitInfo.remaining > 0;
+      
+      if (!shouldAutoRefreshNow) {
+        // Return cached data with updated cache info
+        console.log('Returning cached analytics data (no auto-refresh needed)');
+        return res.json({
+          ...cachedData,
+          cache_info: {
+            ...cachedData.cache_info,
+            from_cache: true,
+            cache_age_hours: Math.floor(cacheAge / (60 * 60 * 1000)),
+            last_cached: new Date(analyticsCache.analytics.timestamp).toISOString()
+          },
+          rate_limit: rateLimitInfo
+        });
       }
     }
 
-    // Calculate total engagement from recent tweets
-    let totalLikes = 0;
-    let totalRetweets = 0;
-    let totalReplies = 0;
-    let totalQuotes = 0;
-    let tweetsAnalyzed = 0;
-
-    if (recentTweets && recentTweets.data && Array.isArray(recentTweets.data)) {
-      tweetsAnalyzed = recentTweets.data.length;
-      recentTweets.data.forEach(tweet => {
-        if (tweet && tweet.public_metrics) {
-          totalLikes += tweet.public_metrics.like_count || 0;
-          totalRetweets += tweet.public_metrics.retweet_count || 0;
-          totalReplies += tweet.public_metrics.reply_count || 0;
-          totalQuotes += tweet.public_metrics.quote_count || 0;
-        }
-      });
+    // Auto-refresh if conditions are met
+    if (shouldAutoRefresh() && rateLimitInfo.remaining > 0) {
+      console.log('Performing daily auto-refresh of analytics...');
+      try {
+        const freshData = await fetchFreshAnalytics();
+        lastAutoRefresh = Date.now(); // Update auto-refresh timestamp
+        return res.json(freshData);
+      } catch (error) {
+        console.error('Auto-refresh failed, falling back to cache:', error.message);
+        // Fall through to return cached data
+      }
     }
 
-    const analyticsData = {
-      profile: profile || { public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 } },
-      recent_engagement: {
-        total_likes: totalLikes,
-        total_retweets: totalRetweets,
-        total_replies: totalReplies,
-        total_quotes: totalQuotes,
-        tweets_analyzed: tweetsAnalyzed,
-        avg_likes_per_tweet: tweetsAnalyzed > 0 ? Math.round(totalLikes / tweetsAnalyzed) : 0
-      },
-      recent_tweets: recentTweets?.data || [],
-      cache_info: {
-        from_cache: tweetsFromCache,
-        cached_at: tweetsFromCache ? analyticsCache.recentTweets?.timestamp : null
-      }
-    };
-
-    // Cache the results
-    lastAnalyticsCall = now;
-    analyticsCache.analytics = {
-      data: analyticsData,
-      timestamp: now
-    };
-
-    res.json(analyticsData);
-  } catch (error) {
-    console.error('Error fetching analytics:', error);
-    
-    // Return cached analytics if available
-    if (analyticsCache.analytics) {
-      console.log('Returning cached analytics due to API error');
+    // Return cached data if available (no auto-refresh conditions met)
+    if (analyticsCache.analytics && analyticsCache.analytics.data) {
+      const cachedData = analyticsCache.analytics.data;
+      const cacheAge = Date.now() - analyticsCache.analytics.timestamp;
+      
+      console.log('Returning cached analytics data');
       return res.json({
-        ...analyticsCache.analytics.data,
+        ...cachedData,
         cache_info: {
+          ...cachedData.cache_info,
           from_cache: true,
-          cached_at: analyticsCache.analytics.timestamp,
-          error: 'Fresh data unavailable'
-        }
+          cache_age_hours: Math.floor(cacheAge / (60 * 60 * 1000)),
+          last_cached: new Date(analyticsCache.analytics.timestamp).toISOString(),
+          auto_refresh_available: shouldAutoRefresh(),
+          rate_limited: rateLimitInfo.remaining <= 0
+        },
+        rate_limit: rateLimitInfo
       });
     }
-    
-    // Fallback analytics with basic structure
+
+    // No cached data available - return fallback
+    console.log('No cached analytics data available, returning fallback');
     const fallbackData = {
       profile: { 
         public_metrics: { followers_count: 0, following_count: 0, tweet_count: 0 },
@@ -753,14 +908,22 @@ app.get('/api/analytics', async (req, res) => {
         avg_likes_per_tweet: 0
       },
       recent_tweets: [],
-      error: {
-        message: error.code === 429 ? 'Rate limited - data temporarily unavailable' : 'Analytics temporarily unavailable',
-        code: error.code,
-        can_retry: true
-      }
+      cache_info: {
+        from_cache: false,
+        no_data: true,
+        message: 'No analytics data available - manual refresh required'
+      },
+      rate_limit: rateLimitInfo
     };
     
-    res.status(error.code === 429 ? 429 : 500).json(fallbackData);
+    res.json(fallbackData);
+  } catch (error) {
+    console.error('Error in analytics endpoint:', error);
+    res.status(500).json({ 
+      error: 'Analytics temporarily unavailable',
+      details: error.message,
+      rate_limit: rateLimitInfo
+    });
   }
 });
 

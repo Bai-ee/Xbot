@@ -65,6 +65,9 @@ class TwitterBotDashboard {
             composeTextarea.addEventListener('input', (e) => this.handleComposeInput(e));
         }
 
+        // Analytics refresh button
+        document.getElementById('refresh-analytics')?.addEventListener('click', () => this.refreshAnalytics());
+
         // Auto-refresh when tab becomes visible
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && this.currentTab === 'tweets') {
@@ -122,44 +125,152 @@ class TwitterBotDashboard {
     }
 
     async loadAnalytics() {
+        // Load rate limit info first
+        await this.loadRateLimitInfo();
+
         this.showLoading(true);
         try {
-            // Load analytics data
+            // Load cached analytics data (no forced refresh)
             const analyticsResponse = await fetch('/api/analytics');
             if (analyticsResponse.ok) {
                 const analytics = await analyticsResponse.json();
                 this.renderAnalytics(analytics);
+                this.updateCacheInfo(analytics);
             } else {
                 console.error('Failed to load analytics');
-                this.showToast('Failed to load analytics data', 'error');
+                this.showAnalyticsError('Failed to load analytics data');
             }
-
-            // Load followers data
-            const followersResponse = await fetch('/api/followers');
-            if (followersResponse.ok) {
-                const followers = await followersResponse.json();
-                this.updateFollowersData(followers);
-            }
-
-            // Load recent tweets with rate limit handling
-            try {
-                const recentResponse = await fetch('/api/recent-tweets');
-                if (recentResponse.ok) {
-                    const recentTweets = await recentResponse.json();
-                    this.renderRecentTweets(recentTweets);
-                } else if (recentResponse.status === 429) {
-                    this.showRecentTweetsRateLimit();
-                }
-            } catch (error) {
-                console.log('Recent tweets unavailable due to rate limits');
-                this.showRecentTweetsRateLimit();
-            }
-
         } catch (error) {
             console.error('Error loading analytics:', error);
-            this.showToast('Network error loading analytics', 'error');
+            this.showAnalyticsError('Network error loading analytics');
         } finally {
             this.showLoading(false);
+        }
+    }
+
+    async refreshAnalytics() {
+        const refreshBtn = document.getElementById('refresh-analytics');
+        const originalText = refreshBtn?.textContent;
+        
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('loading');
+            refreshBtn.textContent = '🔄 Refreshing...';
+        }
+
+        try {
+            console.log('Manual analytics refresh requested...');
+            const response = await fetch('/api/refresh-analytics', { method: 'POST' });
+            const result = await response.json();
+
+            if (response.ok) {
+                this.renderAnalytics(result.data);
+                this.updateCacheInfo(result.data);
+                this.loadRateLimitInfo(); // Update rate limit display
+                this.showToast('📊 Analytics refreshed successfully!', 'success');
+            } else {
+                // Handle rate limit or other errors
+                if (response.status === 429) {
+                    this.showToast(`Rate limit reached: ${result.message}`, 'warning');
+                    // Still show cached data if available
+                    if (result.cached_data) {
+                        this.renderAnalytics(result.cached_data);
+                        this.updateCacheInfo(result.cached_data);
+                    }
+                } else {
+                    this.showToast(`Refresh failed: ${result.error}`, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing analytics:', error);
+            this.showToast('Network error during refresh', 'error');
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('loading');
+                refreshBtn.textContent = originalText;
+            }
+        }
+    }
+
+    async loadRateLimitInfo() {
+        try {
+            const response = await fetch('/api/rate-limit');
+            if (response.ok) {
+                const rateLimitData = await response.json();
+                this.updateRateLimitDisplay(rateLimitData);
+            }
+        } catch (error) {
+            console.error('Error loading rate limit info:', error);
+        }
+    }
+
+    updateRateLimitDisplay(rateLimitData) {
+        const remainingEl = document.getElementById('rate-limit-remaining');
+        const totalEl = document.getElementById('rate-limit-total');
+        const resetEl = document.getElementById('rate-limit-reset');
+        const refreshBtn = document.getElementById('refresh-analytics');
+
+        if (remainingEl) remainingEl.textContent = rateLimitData.remaining || 0;
+        if (totalEl) totalEl.textContent = rateLimitData.limit || 25;
+
+        // Update reset time
+        if (resetEl && rateLimitData.timeUntilResetHours) {
+            resetEl.textContent = `Resets in ${rateLimitData.timeUntilResetHours}h`;
+        } else if (resetEl) {
+            resetEl.textContent = '';
+        }
+
+        // Update refresh button state
+        if (refreshBtn) {
+            if (rateLimitData.remaining <= 0) {
+                refreshBtn.disabled = true;
+                refreshBtn.title = `Rate limit reached. Resets in ${rateLimitData.timeUntilResetHours || '?'}h`;
+            } else {
+                refreshBtn.disabled = false;
+                refreshBtn.title = 'Manually refresh analytics data';
+            }
+        }
+    }
+
+    updateCacheInfo(analytics) {
+        const cacheStatusEl = document.getElementById('cache-status');
+        const lastUpdatedEl = document.getElementById('last-updated');
+
+        if (!cacheStatusEl || !lastUpdatedEl || !analytics) return;
+
+        const cacheInfo = analytics.cache_info || {};
+        
+        // Update cache status
+        cacheStatusEl.className = 'cache-status';
+        if (cacheInfo.from_cache) {
+            cacheStatusEl.textContent = `📦 Cached data (${cacheInfo.cache_age_hours || 0}h old)`;
+            cacheStatusEl.classList.add('from-cache');
+        } else if (cacheInfo.refreshed_at) {
+            cacheStatusEl.textContent = '✨ Fresh data';
+            cacheStatusEl.classList.add('fresh');
+        } else if (cacheInfo.no_data) {
+            cacheStatusEl.textContent = '⚠️ No data available';
+            cacheStatusEl.classList.add('error');
+        } else {
+            cacheStatusEl.textContent = '📊 Analytics loaded';
+        }
+
+        // Update last updated time
+        const lastUpdated = cacheInfo.refreshed_at || cacheInfo.last_cached;
+        if (lastUpdated) {
+            const updateTime = new Date(lastUpdated);
+            lastUpdatedEl.textContent = `Updated: ${this.formatDate(updateTime)}`;
+        } else {
+            lastUpdatedEl.textContent = '';
+        }
+    }
+
+    showAnalyticsError(message) {
+        const cacheStatusEl = document.getElementById('cache-status');
+        if (cacheStatusEl) {
+            cacheStatusEl.className = 'cache-status error';
+            cacheStatusEl.textContent = '❌ ' + message;
         }
     }
 
@@ -183,31 +294,67 @@ class TwitterBotDashboard {
     }
 
     renderAnalytics(analytics) {
-        if (analytics.profile) {
-            // Account overview
-            document.getElementById('followers-count').textContent = this.formatNumber(analytics.profile.public_metrics.followers_count);
-            document.getElementById('following-count').textContent = this.formatNumber(analytics.profile.public_metrics.following_count);
-            document.getElementById('total-tweets-count').textContent = this.formatNumber(analytics.profile.public_metrics.tweet_count);
-            document.getElementById('total-likes-count').textContent = this.formatNumber(analytics.profile.public_metrics.like_count || 0);
-        }
+        if (!analytics) return;
 
-        if (analytics.recent_engagement) {
-            // Recent engagement
-            document.getElementById('recent-likes').textContent = this.formatNumber(analytics.recent_engagement.total_likes);
-            document.getElementById('recent-retweets').textContent = this.formatNumber(analytics.recent_engagement.total_retweets);
-            document.getElementById('recent-replies').textContent = this.formatNumber(analytics.recent_engagement.total_replies);
-            document.getElementById('avg-likes').textContent = this.formatNumber(analytics.recent_engagement.avg_likes_per_tweet);
-        }
+        // Handle profile metrics
+        const profile = analytics.profile || {};
+        const profileMetrics = profile.public_metrics || {};
+        const engagement = analytics.recent_engagement || {};
+        
+        this.updateFollowersData({
+            followers_count: profileMetrics.followers_count || 0,
+            following_count: profileMetrics.following_count || 0,
+            tweet_count: profileMetrics.tweet_count || 0,
+            listed_count: profileMetrics.listed_count || 0,
+            username: profile.username || 'N/A',
+            name: profile.name || 'N/A',
+            total_likes: engagement.total_likes || 0  // Use recent engagement for total likes display
+        });
 
-        if (analytics.recent_tweets) {
-            this.renderRecentTweets(analytics.recent_tweets);
+        // Update recent engagement stats
+        const recentLikesEl = document.getElementById('recent-likes');
+        const recentRetweetsEl = document.getElementById('recent-retweets');
+        const recentRepliesEl = document.getElementById('recent-replies');
+        const avgLikesEl = document.getElementById('avg-likes');
+
+        if (recentLikesEl) recentLikesEl.textContent = this.formatNumber(engagement.total_likes || 0);
+        if (recentRetweetsEl) recentRetweetsEl.textContent = this.formatNumber(engagement.total_retweets || 0);
+        if (recentRepliesEl) recentRepliesEl.textContent = this.formatNumber(engagement.total_replies || 0);
+        if (avgLikesEl) avgLikesEl.textContent = this.formatNumber(engagement.avg_likes_per_tweet || 0);
+
+        // Handle recent tweets
+        const recentTweets = analytics.recent_tweets || [];
+        this.renderRecentTweets(recentTweets);
+
+        // Update rate limit info if available
+        if (analytics.rate_limit) {
+            this.updateRateLimitDisplay(analytics.rate_limit);
         }
     }
 
     updateFollowersData(followers) {
-        document.getElementById('followers-count').textContent = this.formatNumber(followers.followers_count);
-        document.getElementById('following-count').textContent = this.formatNumber(followers.following_count);
-        document.getElementById('total-tweets-count').textContent = this.formatNumber(followers.tweet_count);
+        // Update account overview stats
+        const followersCountEl = document.getElementById('followers-count');
+        const followingCountEl = document.getElementById('following-count');
+        const totalTweetsCountEl = document.getElementById('total-tweets-count');
+        const totalLikesCountEl = document.getElementById('total-likes-count');
+
+        if (followersCountEl) followersCountEl.textContent = this.formatNumber(followers.followers_count || 0);
+        if (followingCountEl) followingCountEl.textContent = this.formatNumber(followers.following_count || 0);
+        if (totalTweetsCountEl) totalTweetsCountEl.textContent = this.formatNumber(followers.tweet_count || 0);
+        
+        // For total likes, we'll use recent engagement data (since Twitter doesn't provide total likes in profile)
+        if (totalLikesCountEl) {
+            // This will be updated by renderAnalytics when engagement data is available
+            totalLikesCountEl.textContent = this.formatNumber(followers.total_likes || 0);
+        }
+
+        // Update profile info (if we have it)
+        const profileNameEl = document.getElementById('profile-name');
+        const profileUsernameEl = document.getElementById('profile-username');
+        
+        if (profileNameEl && followers.name) profileNameEl.textContent = followers.name;
+        if (profileUsernameEl && followers.username) profileUsernameEl.textContent = '@' + followers.username;
     }
 
     renderRecentTweets(tweets) {

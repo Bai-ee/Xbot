@@ -72,6 +72,29 @@
 
         <!-- Analytics Tab -->
         <div class="tab-content" id="analytics-tab">
+            <!-- Analytics Header with Refresh Controls -->
+            <div class="analytics-header">
+                <div class="analytics-title">
+                    <h2>📊 Analytics Dashboard</h2>
+                    <p class="analytics-subtitle">Twitter engagement and profile insights</p>
+                </div>
+                <div class="analytics-controls">
+                    <div class="rate-limit-info" id="rate-limit-info">
+                        <span class="rate-limit-text">Refreshes: <span id="rate-limit-remaining">-</span>/<span id="rate-limit-total">-</span></span>
+                        <span class="rate-limit-reset" id="rate-limit-reset"></span>
+                    </div>
+                    <button id="refresh-analytics" class="btn btn-primary refresh-btn">
+                        🔄 Refresh Analytics
+                    </button>
+                </div>
+            </div>
+
+            <!-- Last Updated Info -->
+            <div class="cache-info" id="cache-info">
+                <span class="cache-status" id="cache-status">Loading analytics...</span>
+                <span class="last-updated" id="last-updated"></span>
+            </div>
+
             <div class="analytics-grid">
                 <div class="analytics-card">
                     <h3>📈 Account Overview</h3>
