@@ -2376,7 +2376,7 @@ app.post('/api/image/quick', async (req, res) => {
     const result = await imageAgent.handleMessage('Generate a Chicago skyline image', {
       imagePrompt: 'A stunning Chicago skyline at sunset with modern skyscrapers',
       imageStyle: 'realistic',
-      imageSize: '720x720',
+      imageSize: '1024x1024',
       imageQuality: 'standard'
     });
     

@@ -1224,6 +1224,11 @@ class TwitterBotDashboard {
             setTimeout(() => {
                 this.initializeAudioGeneration();
             }, 100);
+        } else if (tabName === 'image') {
+            console.log('🖼️ Switching to image tab - initializing image generation');
+            setTimeout(() => {
+                this.initializeImageGeneration();
+            }, 100);
         }
     }
 

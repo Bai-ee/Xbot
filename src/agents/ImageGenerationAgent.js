@@ -1,4 +1,4 @@
-const BaseAgent = require('./BaseAgent.js');
+const { BaseAgent } = require('./BaseAgent.js');
 const { ImageGenerator } = require('../lib/ImageGenerator.js');
 
 /**
@@ -7,7 +7,7 @@ const { ImageGenerator } = require('../lib/ImageGenerator.js');
  */
 class ImageGenerationAgent extends BaseAgent {
     constructor() {
-        super('image_generator', 'Image Generation Agent');
+        super('image_generator', ['image_generation', 'visual_assets']);
         this.imageGenerator = new ImageGenerator();
         console.log('✅ ImageGenerationAgent initialized with ImageGenerator');
     }
@@ -71,8 +71,8 @@ class ImageGenerationAgent extends BaseAgent {
         let params = {
             prompt: 'A stunning Chicago skyline at sunset with modern skyscrapers',
             style: 'realistic',
-            width: 720,
-            height: 720,
+            width: 1024,
+            height: 1024,
             quality: 'standard'
         };
 
@@ -116,19 +116,19 @@ class ImageGenerationAgent extends BaseAgent {
         if (message.toLowerCase().includes('minimalist')) params.style = 'minimalist';
         if (message.toLowerCase().includes('cyberpunk')) params.style = 'cyberpunk';
 
-        // Extract size preferences
+        // Extract size preferences - DALL-E 3 only supports specific sizes
         if (message.toLowerCase().includes('square')) {
-            params.width = 720;
-            params.height = 720;
+            params.width = 1024;
+            params.height = 1024;
         } else if (message.toLowerCase().includes('widescreen') || message.toLowerCase().includes('landscape')) {
-            params.width = 1920;
-            params.height = 1080;
+            params.width = 1792;
+            params.height = 1024;
         } else if (message.toLowerCase().includes('portrait')) {
-            params.width = 1080;
-            params.height = 1920;
+            params.width = 1024;
+            params.height = 1792;
         } else if (message.toLowerCase().includes('large')) {
-            params.width = 1920;
-            params.height = 1920;
+            params.width = 1024;
+            params.height = 1024;
         }
 
         // Extract quality preferences
@@ -142,10 +142,17 @@ class ImageGenerationAgent extends BaseAgent {
         if (context.imagePrompt) params.prompt = context.imagePrompt;
         if (context.imageStyle) params.style = context.imageStyle;
         if (context.imageSize) {
-            const [width, height] = context.imageSize.split('x').map(Number);
-            if (width && height) {
-                params.width = width;
-                params.height = height;
+            // Map custom sizes to DALL-E 3 supported sizes
+            const sizeMap = {
+                '720x720': { width: 1024, height: 1024 },
+                '1920x1080': { width: 1792, height: 1024 },
+                '1080x1920': { width: 1024, height: 1792 },
+                '1920x1920': { width: 1024, height: 1024 }
+            };
+            
+            if (sizeMap[context.imageSize]) {
+                params.width = sizeMap[context.imageSize].width;
+                params.height = sizeMap[context.imageSize].height;
             }
         }
         if (context.imageQuality) params.quality = context.imageQuality;
