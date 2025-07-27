@@ -49,11 +49,11 @@ class TwitterBotDashboard {
     }
 
     setupEventListeners() {
-        // Tab navigation
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const tab = e.target.dataset.tab;
-                this.showTab(tab);
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                this.switchTab(tabName);
             });
         });
 
@@ -92,6 +92,23 @@ class TwitterBotDashboard {
                 this.loadTweets();
             }
         });
+
+        // Chat functionality
+        const sendChatBtn = document.getElementById('send-chat');
+        const chatInput = document.getElementById('chat-input');
+        
+        if (sendChatBtn) {
+            sendChatBtn.addEventListener('click', () => this.sendChatMessage());
+        }
+        
+        if (chatInput) {
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage();
+                }
+            });
+        }
     }
 
     showTab(tabName) {
@@ -1138,19 +1155,174 @@ class TwitterBotDashboard {
         return num.toString();
     }
 
-    formatDate(dateString) {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+    formatDate(date) {
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         });
     }
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    // Chat functionality methods
+    switchTab(tabName) {
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        
+        // Remove active class from all tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show selected tab content
+        const tabContent = document.getElementById(`${tabName}-tab`);
+        if (tabContent) {
+            tabContent.style.display = 'block';
+        }
+        
+        // Add active class to selected tab button
+        const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+        
+        // Update current tab
+        this.currentTab = tabName;
+        
+        // Load tab-specific data
+        if (tabName === 'queue') {
+            this.loadQueue();
+        } else if (tabName === 'analytics') {
+            this.loadAnalytics();
+        }
+    }
+
+    async sendChatMessage() {
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-chat');
+        const sendText = sendBtn.querySelector('.send-text');
+        const sendLoading = sendBtn.querySelector('.send-loading');
+        
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        // Add user message to chat
+        this.addChatMessage(message, 'user');
+        
+        // Clear input and disable send button
+        chatInput.value = '';
+        sendBtn.disabled = true;
+        sendText.style.display = 'none';
+        sendLoading.style.display = 'flex';
+        
+        try {
+            // Get current context for the AI
+            const context = await this.getChatContext();
+            
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message, context })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                // Add AI response to chat
+                this.addChatMessage(result.response, 'ai');
+            } else {
+                throw new Error(result.error || 'Failed to get AI response');
+            }
+            
+        } catch (error) {
+            console.error('Chat error:', error);
+            this.addChatMessage(
+                'Sorry, I encountered an error. Please try again or check if your OpenAI API key is configured correctly.',
+                'ai',
+                true
+            );
+        } finally {
+            // Re-enable send button
+            sendBtn.disabled = false;
+            sendText.style.display = 'inline';
+            sendLoading.style.display = 'none';
+            
+            // Focus back to input
+            chatInput.focus();
+        }
+    }
+
+    addChatMessage(content, sender, isError = false) {
+        const chatMessages = document.getElementById('chat-messages');
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = sender === 'user' ? '👤' : '🤖';
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        
+        if (isError) {
+            messageContent.style.background = '#e74c3c';
+            messageContent.style.color = 'white';
+        }
+        
+        // Convert markdown-like formatting to HTML
+        let formattedContent = content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+        
+        messageContent.innerHTML = formattedContent;
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(messageContent);
+        
+        chatMessages.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async getChatContext() {
+        // Gather current dashboard context for the AI
+        try {
+            const context = {};
+            
+            // Get Twitter rate limit info if available
+            if (typeof rateLimitInfo !== 'undefined') {
+                context.remainingTweets = rateLimitInfo.remaining;
+                context.analyticsRemaining = rateLimitInfo.remaining;
+            }
+            
+            // Get recent engagement data if available
+            if (this.currentTab === 'analytics') {
+                const analyticsData = document.getElementById('analytics-tab');
+                if (analyticsData && analyticsData.style.display !== 'none') {
+                    // Try to extract some analytics context
+                    const totalLikes = document.getElementById('total-likes-count')?.textContent;
+                    const followers = document.getElementById('followers-count')?.textContent;
+                    
+                    if (totalLikes && followers) {
+                        context.recentEngagement = `${followers} followers, ${totalLikes} total likes`;
+                    }
+                }
+            }
+            
+            return context;
+        } catch (error) {
+            console.warn('Error getting chat context:', error);
+            return {};
+        }
     }
 }
 

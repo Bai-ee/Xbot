@@ -13,15 +13,15 @@
             <p class="subtitle">Manage and approve your tweets before they go live</p>
         </header>
 
-        <!-- Navigation Tabs -->
+        <!-- Tab Navigation -->
         <div class="tabs">
-            <button class="tab-button active" data-tab="tweets">📝 Tweet Queue</button>
-            <button class="tab-button" data-tab="analytics">📊 Analytics</button>
-            <button class="tab-button" data-tab="profile">👤 Profile</button>
+            <button class="tab-btn active" data-tab="queue">📝 Queue</button>
+            <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
+            <button class="tab-btn" data-tab="chat">🤖 AI Assistant</button>
         </div>
 
-        <!-- Tweet Queue Tab -->
-        <div class="tab-content active" id="tweets-tab">
+        <!-- Queue Tab -->
+        <div class="tab-content" id="queue-tab" style="display: block;">
             <div class="stats-grid">
                 <div class="stats-card">
                     <div class="stats-number" id="pending-count">0</div>
@@ -166,6 +166,46 @@
                     <h3>🎵 Recent DJ Tweets</h3>
                     <div class="recent-tweets" id="recent-tweets-list">
                         <div class="loading">Loading recent tweets...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Tab -->
+        <div class="tab-content" id="chat-tab" style="display: none;">
+            <div class="chat-interface">
+                <div class="chat-header">
+                    <h3>🤖 AI Twitter Assistant</h3>
+                    <p>Get help with tweet creation, analytics insights, scheduling, and more!</p>
+                </div>
+                
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message ai-message">
+                        <div class="message-avatar">🤖</div>
+                        <div class="message-content">
+                            <p>Hello! I'm your AI Twitter assistant. I can help you with:</p>
+                            <ul>
+                                <li>🎵 Creating engaging tweets about music and DJ content</li>
+                                <li>📊 Analyzing your Twitter analytics and performance</li>
+                                <li>⏰ Suggesting optimal posting times</li>
+                                <li>📝 Improving your existing tweets</li>
+                                <li>🎯 Strategic advice for growing your audience</li>
+                            </ul>
+                            <p>How can I help you today?</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="chat-input" 
+                            placeholder="Ask me anything about Twitter management, content creation, or analytics..."
+                            rows="3"></textarea>
+                        <button id="send-chat" class="btn btn-primary">
+                            <span class="send-text">Send</span>
+                            <span class="send-loading" style="display: none;">Thinking...</span>
+                        </button>
                     </div>
                 </div>
             </div>

@@ -6,9 +6,15 @@ const fs = require('fs-extra');
 const path = require('path');
 const multer = require('multer');
 const { TwitterApi } = require('twitter-api-v2');
+const OpenAI = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1270,6 +1276,73 @@ app.post('/api/clear-cache', (req, res) => {
     timestamp: new Date().toISOString(),
     warning: 'Next analytics request will show fallback data until successful API call'
   });
+});
+
+// Chat endpoint for AI assistant
+app.post('/api/chat', async (req, res) => {
+  const { message, context = {} } = req.body;
+  
+  if (!message || message.trim().length === 0) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  try {
+    console.log(`AI Chat request: ${message.substring(0, 100)}...`);
+
+    // Create a Twitter-focused system prompt
+    const systemPrompt = `You are an AI assistant specialized in Twitter/X management for a Creative Tech DJ. 
+
+Your expertise includes:
+- Creating engaging tweets about music, DJ performances, and creative technology
+- Analyzing Twitter analytics and providing actionable insights
+- Suggesting optimal posting times and content strategies
+- Helping with hashtag strategies and audience engagement
+- Providing advice on building a music/DJ brand on social media
+
+Current context:
+- User has ${context.remainingTweets || 'several'} tweets remaining today
+- Analytics rate limits: ${context.analyticsRemaining || 'unknown'} refreshes available
+- Recent performance: ${context.recentEngagement || 'data not available'}
+
+Be helpful, creative, and focused on practical Twitter/music industry advice. Keep responses concise but informative.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message }
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+    
+    console.log(`AI Chat response: ${aiResponse.substring(0, 100)}...`);
+
+    res.json({
+      success: true,
+      response: aiResponse,
+      usage: completion.usage
+    });
+
+  } catch (error) {
+    console.error('OpenAI Chat Error:', error);
+    
+    let errorMessage = 'Failed to get AI response';
+    if (error.code === 'insufficient_quota') {
+      errorMessage = 'OpenAI API quota exceeded. Please check your billing.';
+    } else if (error.code === 'invalid_api_key') {
+      errorMessage = 'Invalid OpenAI API key. Please check your configuration.';
+    } else if (error.code === 'rate_limit_exceeded') {
+      errorMessage = 'OpenAI rate limit exceeded. Please try again in a moment.';
+    }
+
+    res.status(500).json({
+      error: errorMessage,
+      details: error.message
+    });
+  }
 });
 
 // Start server
