@@ -15,19 +15,174 @@ const PORT = process.env.PORT || 3000;
 let openai = null;
 let openaiAvailable = false;
 
-try {
-  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+// API Key validation function from troubleshooting guide
+function validateOpenAIKeyFormat(apiKey) {
+  if (!apiKey) return { valid: false, error: 'API key is missing' };
+  
+  if (typeof apiKey !== 'string') {
+    return { valid: false, error: 'API key must be a string' };
+  }
+  
+  const trimmed = apiKey.trim();
+  if (trimmed !== apiKey) {
+    return { valid: false, error: 'API key has leading/trailing whitespace' };
+  }
+  
+  if (!trimmed.startsWith('sk-')) {
+    return { valid: false, error: 'API key must start with "sk-"' };
+  }
+  
+  if (trimmed.length < 50) {
+    return { valid: false, error: 'API key appears too short' };
+  }
+  
+  if (!/^sk-[A-Za-z0-9_-]+$/.test(trimmed)) {
+    return { valid: false, error: 'API key contains invalid characters' };
+  }
+  
+  return { valid: true };
+}
+
+// API Key validation with actual OpenAI API call
+async function validateKeyWithAPI(apiKey) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
+    
+    if (response.status === 401) {
+      const error = await response.json();
+      return { 
+        valid: false, 
+        error: 'API key is invalid, expired, or revoked',
+        details: error.error?.message 
+      };
+    }
+    
+    if (response.status === 429) {
+      return { 
+        valid: true, // Key is valid but rate limited
+        warning: 'API key is valid but rate limited'
+      };
+    }
+    
+    return { 
+      valid: response.status === 200,
+      models: response.status === 200 ? (await response.json()).data?.length : 0
+    };
+    
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: 'Network error during validation',
+      details: error.message 
+    };
+  }
+}
+
+// Debug environment setup
+function debugEnvironmentSetup() {
+  console.log('\n🔍 === OPENAI API KEY DEBUG ===');
+  
+  // Check raw environment variable
+  const rawKey = process.env.OPENAI_API_KEY;
+  console.log('1. Raw API key present:', !!rawKey);
+  console.log('2. Raw API key length:', rawKey?.length || 0);
+  console.log('3. Raw API key preview:', rawKey ? `${rawKey.substring(0, 12)}...${rawKey.substring(rawKey.length - 8)}` : 'MISSING');
+  
+  // Check format validation
+  const formatCheck = validateOpenAIKeyFormat(rawKey);
+  console.log('4. Format validation:', formatCheck.valid ? '✅ PASSED' : `❌ ${formatCheck.error}`);
+  
+  // Check for common issues
+  if (rawKey) {
+    const issues = [];
+    
+    if (rawKey !== rawKey.trim()) {
+      issues.push('Has leading/trailing whitespace');
+    }
+    
+    if (rawKey.includes(' ')) {
+      issues.push('Contains spaces');
+    }
+    
+    if (rawKey.includes('\n') || rawKey.includes('\r')) {
+      issues.push('Contains line breaks');
+    }
+    
+    if (issues.length > 0) {
+      console.log('⚠️  Potential issues:', issues.join(', '));
+    }
+  }
+  
+  console.log('=== END DEBUG ===\n');
+}
+
+// Initialize with comprehensive validation
+async function initializeOpenAI() {
+  debugEnvironmentSetup();
+  
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      console.log('⚠️  OpenAI API key not provided - AI chat will be disabled');
+      return;
+    }
+
+    // Format validation
+    const formatValidation = validateOpenAIKeyFormat(apiKey);
+    if (!formatValidation.valid) {
+      console.log(`❌ Invalid API key format: ${formatValidation.error}`);
+      return;
+    }
+
+    console.log('✅ API key format validation passed');
+
+    // Test with actual OpenAI API
+    console.log('🔍 Validating API key with OpenAI...');
+    const apiValidation = await validateKeyWithAPI(apiKey);
+    
+    if (!apiValidation.valid) {
+      console.log(`❌ API key validation failed: ${apiValidation.error}`);
+      if (apiValidation.details) {
+        console.log(`   Details: ${apiValidation.details}`);
+      }
+      console.log('🔧 Suggested fixes:');
+      console.log('   1. Generate a new API key at https://platform.openai.com/api-keys');
+      console.log('   2. Check if your OpenAI account has available credits');
+      console.log('   3. Verify the key has not expired or been revoked');
+      return;
+    }
+
+    if (apiValidation.warning) {
+      console.log(`⚠️  ${apiValidation.warning}`);
+    }
+
+    console.log(`✅ API key validated successfully! Access to ${apiValidation.models || 'unknown'} models`);
+
+    // Initialize OpenAI client
+    openai = new OpenAI({
+      apiKey: apiKey.trim(),
+      timeout: 60000,
+      maxRetries: 3
+    });
+    
     openaiAvailable = true;
     console.log('✅ OpenAI client initialized successfully');
-  } else {
-    console.log('⚠️  OpenAI API key not provided - AI chat will be disabled');
+
+  } catch (error) {
+    console.log('❌ Failed to initialize OpenAI client:', error.message);
+    console.log('🔧 Check your OPENAI_API_KEY environment variable');
   }
-} catch (error) {
-  console.log('⚠️  Failed to initialize OpenAI client:', error.message);
 }
+
+// Initialize OpenAI with validation
+initializeOpenAI();
 
 // Configure multer for file uploads
 const upload = multer({
