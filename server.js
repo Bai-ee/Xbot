@@ -2539,4 +2539,36 @@ app.listen(PORT, async () => {
     console.error('⚠️ Multi-Agent Framework initialization failed, but server is still running:', error.message);
     console.log('🔄 Server will continue without multi-agent features');
   }
+});
+
+// Debug endpoint to check file system
+app.get('/api/debug/filesystem', (req, res) => {
+  const fs = require('fs-extra');
+  const path = require('path');
+  
+  try {
+    const cwd = process.cwd();
+    const dataPath = path.join(cwd, 'data');
+    const publicPath = path.join(cwd, 'public');
+    
+    const debugInfo = {
+      currentWorkingDirectory: cwd,
+      dataDirectoryExists: fs.existsSync(dataPath),
+      publicDirectoryExists: fs.existsSync(publicPath),
+      dataDirectoryContents: fs.existsSync(dataPath) ? fs.readdirSync(dataPath) : [],
+      publicDirectoryContents: fs.existsSync(publicPath) ? fs.readdirSync(publicPath) : [],
+      artistsFileExists: fs.existsSync(path.join(dataPath, 'sample-artists.json')),
+      artistsFileSize: fs.existsSync(path.join(dataPath, 'sample-artists.json')) ? fs.statSync(path.join(dataPath, 'sample-artists.json')).size : 0
+    };
+    
+    res.json({
+      success: true,
+      debug: debugInfo
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 }); 
