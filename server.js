@@ -1707,7 +1707,7 @@ app.get('/api/video/artists', async (req, res) => {
   try {
     const fs = require('fs-extra');
     const path = require('path');
-    const artistsPath = path.join(process.cwd(), 'data', 'sample-artists.json');
+    const artistsPath = path.join(process.cwd(), 'public', 'artists.json');
     
     console.log('🔍 Checking artists file path:', artistsPath);
     console.log('🔍 Current working directory:', process.cwd());
