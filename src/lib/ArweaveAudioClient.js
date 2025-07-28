@@ -4,26 +4,38 @@ const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-// Configure FFmpeg to use static binary
-try {
-  const ffmpegPath = require('ffmpeg-static');
-  const fs = require('fs');
-  
-  console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
-  console.log('[ArweaveAudioClient] Static FFmpeg exists:', fs.existsSync(ffmpegPath));
-  
-  ffmpeg.setFfmpegPath(ffmpegPath);
-  console.log('[ArweaveAudioClient] Using static FFmpeg binary');
-  
-} catch (error) {
-  console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
-  // Try system FFmpeg as fallback
+// Configure FFmpeg - use system FFmpeg on Railway, static binary locally
+if (process.env.NODE_ENV === 'production') {
+  console.log('[ArweaveAudioClient] Production environment - using system FFmpeg');
   try {
     const { execSync } = require('child_process');
     execSync('ffmpeg -version', { stdio: 'ignore' });
-    console.log('[ArweaveAudioClient] Using system FFmpeg as fallback');
-  } catch (systemError) {
-    console.error('[ArweaveAudioClient] No FFmpeg found - audio generation will fail');
+    console.log('[ArweaveAudioClient] System FFmpeg available');
+  } catch (error) {
+    console.error('[ArweaveAudioClient] System FFmpeg not found:', error.message);
+  }
+} else {
+  // Use static binary for local development
+  try {
+    const ffmpegPath = require('ffmpeg-static');
+    const fs = require('fs');
+    
+    console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
+    console.log('[ArweaveAudioClient] Static FFmpeg exists:', fs.existsSync(ffmpegPath));
+    
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    console.log('[ArweaveAudioClient] Using static FFmpeg binary');
+    
+  } catch (error) {
+    console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
+    // Try system FFmpeg as fallback
+    try {
+      const { execSync } = require('child_process');
+      execSync('ffmpeg -version', { stdio: 'ignore' });
+      console.log('[ArweaveAudioClient] Using system FFmpeg as fallback');
+    } catch (systemError) {
+      console.error('[ArweaveAudioClient] No FFmpeg found - audio generation will fail');
+    }
   }
 }
 
@@ -237,20 +249,8 @@ class ArweaveAudioClient {
         
                          // Ensure FFmpeg is properly configured for Railway
                  if (process.env.NODE_ENV === 'production') {
-                   console.log('[ArweaveAudioClient] Railway environment - using static FFmpeg binary');
-                   // Re-set the FFmpeg path to ensure it's properly configured
-                   try {
-                     const ffmpegPath = require('ffmpeg-static');
-                     ffmpeg.setFfmpegPath(ffmpegPath);
-                     console.log('[ArweaveAudioClient] Railway: FFmpeg path set to:', ffmpegPath);
-                     
-                     // Add additional Railway-specific options to prevent crashes
-                     if (process.env.RAILWAY_FFMPEG_SIMPLE === 'true') {
-                       console.log('[ArweaveAudioClient] Railway: Using simplified FFmpeg options');
-                     }
-                   } catch (error) {
-                     console.error('[ArweaveAudioClient] Railway: Failed to set FFmpeg path:', error.message);
-                   }
+                   console.log('[ArweaveAudioClient] Railway environment - using system FFmpeg');
+                   // System FFmpeg is already available, no need to set path
                  }
         
         return await new Promise((resolve, reject) => {
