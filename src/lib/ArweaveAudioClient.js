@@ -19,6 +19,17 @@ try {
   }
 }
 
+// Railway-specific FFmpeg setup
+if (process.env.NODE_ENV === 'production') {
+  try {
+    const ffmpegPath = require('ffmpeg-static');
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    console.log('[ArweaveAudioClient] Railway: Using static FFmpeg binary');
+  } catch (error) {
+    console.error('[ArweaveAudioClient] Railway: Failed to set static FFmpeg path:', error.message);
+  }
+}
+
 /**
  * Arweave Audio Client for 30-second audio clip generation
  * Based on the comprehensive build guide - efficiently downloads segments from Arweave
