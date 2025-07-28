@@ -7,6 +7,7 @@ const path = require('path');
 const multer = require('multer');
 const { TwitterApi } = require('twitter-api-v2');
 const OpenAI = require('openai');
+const { execSync } = require('child_process');
 
 // Multi-Agent Framework Integration
 const { environmentConfig } = require('./src/config/environment.js');
@@ -2569,6 +2570,31 @@ app.get('/api/debug/filesystem', (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// Debug endpoint to check FFmpeg status
+app.get('/api/debug/ffmpeg', (req, res) => {
+  try {
+    const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8', timeout: 10000 }).split('\n')[0];
+    const ffmpegCodecs = execSync('ffmpeg -codecs', { encoding: 'utf8', timeout: 10000 }).split('\n').slice(0, 5);
+    
+    res.json({
+      success: true,
+      ffmpegVersion: ffmpegVersion,
+      ffmpegCodecs: ffmpegCodecs,
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version
     });
   }
 }); 
