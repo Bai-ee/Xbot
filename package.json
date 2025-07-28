@@ -14,7 +14,7 @@
     "build": "echo \"Build completed\"",
     "lint": "echo 'Linting not configured'",
     "clean": "rm -rf temp-uploads/* outputs/renders/* outputs/backgrounds/*",
-    "postinstall": "echo 'Post-install script completed' && which ffmpeg || echo 'FFmpeg not found - will use fallback methods'",
+    "postinstall": "echo 'Post-install script completed' && node -e \"try { require('ffmpeg-static'); console.log('✅ FFmpeg static binary available'); } catch(e) { console.log('⚠️ FFmpeg static binary not found:', e.message); }\"",
     "prebuild": "echo \"Pre-build completed\""
   },
   "keywords": [

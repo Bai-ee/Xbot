@@ -4,29 +4,20 @@ const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-// Try to use system FFmpeg first, fallback to static binary
+// Configure FFmpeg to use static binary
 try {
-  const { execSync } = require('child_process');
-  execSync('ffmpeg -version', { stdio: 'ignore' });
-  console.log('[ArweaveAudioClient] Using system FFmpeg');
+  const ffmpegPath = require('ffmpeg-static');
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  console.log('[ArweaveAudioClient] Using static FFmpeg binary');
 } catch (error) {
+  console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
+  // Try system FFmpeg as fallback
   try {
-    const ffmpegPath = require('ffmpeg-static');
-    ffmpeg.setFfmpegPath(ffmpegPath);
-    console.log('[ArweaveAudioClient] Using static FFmpeg binary');
-  } catch (staticError) {
+    const { execSync } = require('child_process');
+    execSync('ffmpeg -version', { stdio: 'ignore' });
+    console.log('[ArweaveAudioClient] Using system FFmpeg as fallback');
+  } catch (systemError) {
     console.error('[ArweaveAudioClient] No FFmpeg found - audio generation will fail');
-  }
-}
-
-// Railway-specific FFmpeg setup
-if (process.env.NODE_ENV === 'production') {
-  try {
-    const ffmpegPath = require('ffmpeg-static');
-    ffmpeg.setFfmpegPath(ffmpegPath);
-    console.log('[ArweaveAudioClient] Railway: Using static FFmpeg binary');
-  } catch (error) {
-    console.error('[ArweaveAudioClient] Railway: Failed to set static FFmpeg path:', error.message);
   }
 }
 
@@ -409,12 +400,6 @@ class ArweaveAudioClient {
       // Check if we have any artists data
       if (!this.artistsData || this.artistsData.length === 0) {
         throw new Error('No artists data available. Please ensure artists.json is properly configured.');
-      }
-
-      // Railway-specific bypass when FFmpeg is not available
-      if (process.env.NODE_ENV === 'production') {
-        console.log('[ArweaveAudioClient] Railway environment detected - using mock audio generation');
-        return await this.generateMockAudioClip(duration, fadeInDuration, fadeOutDuration, prompt, options);
       }
 
       // Extract requested duration and artist from prompt
