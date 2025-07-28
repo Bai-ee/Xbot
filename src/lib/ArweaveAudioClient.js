@@ -4,38 +4,26 @@ const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-// Configure FFmpeg - use system FFmpeg on Railway, static binary locally
-if (process.env.NODE_ENV === 'production') {
-  console.log('[ArweaveAudioClient] Production environment - using system FFmpeg');
+// Configure FFmpeg - use system FFmpeg in Docker container
+try {
+  const { execSync } = require('child_process');
+  execSync('ffmpeg -version', { stdio: 'ignore' });
+  console.log('[ArweaveAudioClient] Using system FFmpeg (Docker)');
+} catch (error) {
+  console.error('[ArweaveAudioClient] System FFmpeg not found:', error.message);
+  // Try @ffmpeg-installer as fallback
   try {
-    const { execSync } = require('child_process');
-    execSync('ffmpeg -version', { stdio: 'ignore' });
-    console.log('[ArweaveAudioClient] System FFmpeg available');
-  } catch (error) {
-    console.error('[ArweaveAudioClient] System FFmpeg not found:', error.message);
-  }
-} else {
-  // Use static binary for local development
-  try {
-    const ffmpegPath = require('ffmpeg-static');
+    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
     const fs = require('fs');
     
-    console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
-    console.log('[ArweaveAudioClient] Static FFmpeg exists:', fs.existsSync(ffmpegPath));
+    console.log('[ArweaveAudioClient] FFmpeg installer path:', ffmpegPath);
+    console.log('[ArweaveAudioClient] FFmpeg exists:', fs.existsSync(ffmpegPath));
     
     ffmpeg.setFfmpegPath(ffmpegPath);
-    console.log('[ArweaveAudioClient] Using static FFmpeg binary');
+    console.log('[ArweaveAudioClient] Using @ffmpeg-installer/ffmpeg as fallback');
     
-  } catch (error) {
-    console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
-    // Try system FFmpeg as fallback
-    try {
-      const { execSync } = require('child_process');
-      execSync('ffmpeg -version', { stdio: 'ignore' });
-      console.log('[ArweaveAudioClient] Using system FFmpeg as fallback');
-    } catch (systemError) {
-      console.error('[ArweaveAudioClient] No FFmpeg found - audio generation will fail');
-    }
+  } catch (installerError) {
+    console.error('[ArweaveAudioClient] No FFmpeg found - audio generation will fail');
   }
 }
 
@@ -247,11 +235,7 @@ class ArweaveAudioClient {
         // Use simpler FFmpeg command for Railway to avoid segmentation faults
         const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
         
-                         // Ensure FFmpeg is properly configured for Railway
-                 if (process.env.NODE_ENV === 'production') {
-                   console.log('[ArweaveAudioClient] Railway environment - using system FFmpeg');
-                   // System FFmpeg is already available, no need to set path
-                 }
+                         // FFmpeg is already configured via system installation in Docker
         
         return await new Promise((resolve, reject) => {
           let command;

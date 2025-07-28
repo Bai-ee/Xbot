@@ -1,6 +1,5 @@
 [build]
-builder = "nixpacks"
-buildCommand = "apt-get update && apt-get install -y ffmpeg && npm ci"
+builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "npm start"
