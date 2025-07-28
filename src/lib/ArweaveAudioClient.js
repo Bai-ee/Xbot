@@ -12,23 +12,9 @@ try {
   console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
   console.log('[ArweaveAudioClient] Static FFmpeg exists:', fs.existsSync(ffmpegPath));
   
-  // Make sure the binary is executable
-  if (fs.existsSync(ffmpegPath)) {
-    fs.chmodSync(ffmpegPath, '755');
-    console.log('[ArweaveAudioClient] Made static FFmpeg binary executable');
-  }
-  
   ffmpeg.setFfmpegPath(ffmpegPath);
   console.log('[ArweaveAudioClient] Using static FFmpeg binary');
   
-  // Test the FFmpeg binary
-  const { execSync } = require('child_process');
-  try {
-    const testResult = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf8', timeout: 10000 });
-    console.log('[ArweaveAudioClient] FFmpeg test successful:', testResult.split('\n')[0]);
-  } catch (testError) {
-    console.error('[ArweaveAudioClient] FFmpeg test failed:', testError.message);
-  }
 } catch (error) {
   console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
   // Try system FFmpeg as fallback
