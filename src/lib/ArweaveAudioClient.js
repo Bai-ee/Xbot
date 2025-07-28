@@ -224,16 +224,32 @@ class ArweaveAudioClient {
       try {
         console.log(`[ArweaveAudioClient] Attempt ${attempt}/${maxRetries} for segment download`);
         
+        // Use simpler FFmpeg command for Railway to avoid segmentation faults
+        const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
+        
         return await new Promise((resolve, reject) => {
-          const command = ffmpeg(url)
-            .setStartTime(startTime)
-            .duration(duration)
-            .audioFilters([
-              `afade=t=in:st=0:d=${fadeInDuration}`,
-              `afade=t=out:st=${duration - fadeOutDuration}:d=${fadeOutDuration}`
-            ])
-            .audioCodec('aac') // Use AAC codec for better compatibility
-            .output(outputPath);
+          let command;
+          
+          if (useSimpleCommand) {
+            // Simple command for Railway - no complex filters
+            console.log('[ArweaveAudioClient] Using simple FFmpeg command for Railway compatibility');
+            command = ffmpeg(url)
+              .setStartTime(startTime)
+              .duration(duration)
+              .audioCodec('aac')
+              .output(outputPath);
+          } else {
+            // Full featured command for local development
+            command = ffmpeg(url)
+              .setStartTime(startTime)
+              .duration(duration)
+              .audioFilters([
+                `afade=t=in:st=0:d=${fadeInDuration}`,
+                `afade=t=out:st=${duration - fadeOutDuration}:d=${fadeOutDuration}`
+              ])
+              .audioCodec('aac')
+              .output(outputPath);
+          }
 
           // Add metadata if provided
           if (metadata) {
