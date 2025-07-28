@@ -1709,8 +1709,13 @@ app.get('/api/video/artists', async (req, res) => {
     const path = require('path');
     const artistsPath = path.join(process.cwd(), 'data', 'sample-artists.json');
     
+    console.log('🔍 Checking artists file path:', artistsPath);
+    console.log('🔍 Current working directory:', process.cwd());
+    console.log('🔍 File exists:', await fs.pathExists(artistsPath));
+    
     if (await fs.pathExists(artistsPath)) {
       const artists = await fs.readJson(artistsPath);
+      console.log('✅ Loaded artists:', artists.length);
       
       const artistsInfo = artists.map(artist => ({
         name: artist.artistName,
@@ -1725,6 +1730,7 @@ app.get('/api/video/artists', async (req, res) => {
         total: artistsInfo.length
       });
     } else {
+      console.log('❌ Artists file not found, using fallback');
       res.json({
         success: true,
         artists: [{
