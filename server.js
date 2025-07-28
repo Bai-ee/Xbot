@@ -1295,11 +1295,23 @@ app.get('/api/analytics', async (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime() 
-  });
+  try {
+    res.status(200).json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.version,
+      memory: process.memoryUsage(),
+      env: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ 
+      status: 'ERROR', 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Debug endpoint to check environment variables (for troubleshooting)
@@ -2488,6 +2500,11 @@ app.listen(PORT, async () => {
   console.log(`🌐 Open http://localhost:${PORT} to access the dashboard`);
   console.log(`🤖 Bot is ready for tweet approval and monitoring!`);
   
-  // Initialize multi-agent framework after server starts
-  await initializeMultiAgentFramework();
+  // Initialize multi-agent framework after server starts (with error handling)
+  try {
+    await initializeMultiAgentFramework();
+  } catch (error) {
+    console.error('⚠️ Multi-Agent Framework initialization failed, but server is still running:', error.message);
+    console.log('🔄 Server will continue without multi-agent features');
+  }
 }); 
