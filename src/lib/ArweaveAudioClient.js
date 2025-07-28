@@ -7,6 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 // Configure FFmpeg to use static binary
 try {
   const ffmpegPath = require('ffmpeg-static');
+  console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
+  console.log('[ArweaveAudioClient] Static FFmpeg exists:', require('fs').existsSync(ffmpegPath));
   ffmpeg.setFfmpegPath(ffmpegPath);
   console.log('[ArweaveAudioClient] Using static FFmpeg binary');
 } catch (error) {
@@ -229,10 +231,19 @@ class ArweaveAudioClient {
         // Use simpler FFmpeg command for Railway to avoid segmentation faults
         const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
         
-        // On Railway, if we've had multiple failures, create a mock audio file instead
-        if (process.env.NODE_ENV === 'production' && attempt === maxRetries) {
-          console.log('[ArweaveAudioClient] Railway FFmpeg failing - creating mock audio file');
-          return await this.createMockAudioFile(outputPath, duration, metadata);
+        // Check if static FFmpeg binary is executable
+        try {
+          const ffmpegPath = require('ffmpeg-static');
+          const fs = require('fs');
+          if (!fs.existsSync(ffmpegPath)) {
+            throw new Error(`Static FFmpeg binary not found at: ${ffmpegPath}`);
+          }
+          // Make sure the binary is executable
+          fs.chmodSync(ffmpegPath, '755');
+          console.log('[ArweaveAudioClient] Static FFmpeg binary is executable');
+        } catch (ffmpegError) {
+          console.error('[ArweaveAudioClient] FFmpeg binary error:', ffmpegError.message);
+          throw new Error(`FFmpeg not available: ${ffmpegError.message}`);
         }
         
         return await new Promise((resolve, reject) => {
