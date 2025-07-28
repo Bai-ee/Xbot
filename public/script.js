@@ -2200,9 +2200,17 @@ class TwitterBotDashboard {
             const response = await fetch('/api/audio/artists');
             const result = await response.json();
             
+            console.log('🔍 API Response:', result);
+            console.log('🔍 Response success:', result.success);
+            console.log('🔍 Data success:', result.data?.success);
+            console.log('🔍 Artists array:', result.data?.artists);
+            console.log('🔍 Artists length:', result.data?.artists?.length);
+            
             if (result.success && result.data.success) {
                 const artists = result.data.artists;
                 const audioArtistSelect = document.getElementById('audio-artist-select');
+                
+                console.log('🔍 Found audio-artist-select element:', !!audioArtistSelect);
                 
                 if (audioArtistSelect) {
                     // Clear existing options except random
@@ -2217,6 +2225,8 @@ class TwitterBotDashboard {
                     });
                     
                     console.log(`✅ Loaded ${artists.length} artists for audio generation`);
+                } else {
+                    console.error('❌ audio-artist-select element not found');
                 }
                 
                 // Update total artists count
@@ -2226,6 +2236,7 @@ class TwitterBotDashboard {
                 }
                 
             } else {
+                console.error('❌ API response indicates failure:', result);
                 throw new Error(result.error || 'Failed to load artists');
             }
             
