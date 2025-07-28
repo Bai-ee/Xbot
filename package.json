@@ -14,7 +14,7 @@
     "build": "echo \"Build completed\"",
     "lint": "echo 'Linting not configured'",
     "clean": "rm -rf temp-uploads/* outputs/renders/* outputs/backgrounds/*",
-    "postinstall": "echo 'Post-install script completed' && node -e \"try { require('ffmpeg-static'); console.log('✅ FFmpeg static binary available'); } catch(e) { console.log('⚠️ FFmpeg static binary not found:', e.message); }\"",
+    "postinstall": "echo 'Post-install script completed' && node -e \"try { const ffmpegPath = require('ffmpeg-static'); const fs = require('fs'); if(fs.existsSync(ffmpegPath)) { fs.chmodSync(ffmpegPath, '755'); console.log('✅ FFmpeg static binary available and executable'); } else { console.log('⚠️ FFmpeg static binary not found'); } } catch(e) { console.log('⚠️ FFmpeg static binary error:', e.message); }\"",
     "prebuild": "echo \"Pre-build completed\""
   },
   "keywords": [

@@ -7,10 +7,28 @@ const { v4: uuidv4 } = require('uuid');
 // Configure FFmpeg to use static binary
 try {
   const ffmpegPath = require('ffmpeg-static');
+  const fs = require('fs');
+  
   console.log('[ArweaveAudioClient] Static FFmpeg path:', ffmpegPath);
-  console.log('[ArweaveAudioClient] Static FFmpeg exists:', require('fs').existsSync(ffmpegPath));
+  console.log('[ArweaveAudioClient] Static FFmpeg exists:', fs.existsSync(ffmpegPath));
+  
+  // Make sure the binary is executable
+  if (fs.existsSync(ffmpegPath)) {
+    fs.chmodSync(ffmpegPath, '755');
+    console.log('[ArweaveAudioClient] Made static FFmpeg binary executable');
+  }
+  
   ffmpeg.setFfmpegPath(ffmpegPath);
   console.log('[ArweaveAudioClient] Using static FFmpeg binary');
+  
+  // Test the FFmpeg binary
+  const { execSync } = require('child_process');
+  try {
+    const testResult = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf8', timeout: 10000 });
+    console.log('[ArweaveAudioClient] FFmpeg test successful:', testResult.split('\n')[0]);
+  } catch (testError) {
+    console.error('[ArweaveAudioClient] FFmpeg test failed:', testError.message);
+  }
 } catch (error) {
   console.error('[ArweaveAudioClient] Failed to set static FFmpeg path:', error.message);
   // Try system FFmpeg as fallback
@@ -231,10 +249,17 @@ class ArweaveAudioClient {
         // Use simpler FFmpeg command for Railway to avoid segmentation faults
         const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
         
-        // For Railway deployment, use a simpler approach to avoid FFmpeg crashes
+        // Ensure FFmpeg is properly configured for Railway
         if (process.env.NODE_ENV === 'production') {
-          console.log('[ArweaveAudioClient] Railway environment - using simplified audio generation');
-          return await this.generateRailwayAudio(url, startTime, duration, outputPath, metadata);
+          console.log('[ArweaveAudioClient] Railway environment - using static FFmpeg binary');
+          // Re-set the FFmpeg path to ensure it's properly configured
+          try {
+            const ffmpegPath = require('ffmpeg-static');
+            ffmpeg.setFfmpegPath(ffmpegPath);
+            console.log('[ArweaveAudioClient] Railway: FFmpeg path set to:', ffmpegPath);
+          } catch (error) {
+            console.error('[ArweaveAudioClient] Railway: Failed to set FFmpeg path:', error.message);
+          }
         }
         
         return await new Promise((resolve, reject) => {

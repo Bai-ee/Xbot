@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+buildCommand = "npm ci && chmod +x node_modules/ffmpeg-static/ffmpeg"
 
 [deploy]
 startCommand = "npm start"
