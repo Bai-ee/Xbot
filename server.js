@@ -239,7 +239,29 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  try {
+    // Try to serve the static file first
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } catch (error) {
+    console.error('Error serving index.html:', error);
+    // Fallback to a simple status page
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Creative Tech DJ Twitter Bot</title>
+          <meta charset="utf-8">
+        </head>
+        <body>
+          <h1>🎵 Creative Tech DJ Twitter Bot</h1>
+          <p>Server is running successfully!</p>
+          <p>Status: <strong>OK</strong></p>
+          <p>Uptime: ${Math.round(process.uptime())} seconds</p>
+          <p><a href="/health">Health Check</a></p>
+        </body>
+      </html>
+    `);
+  }
 });
 
 // Get pending tweets
@@ -2499,6 +2521,8 @@ app.listen(PORT, async () => {
   console.log(`🎵 DJ Twitter Bot Dashboard running on port ${PORT}`);
   console.log(`🌐 Open http://localhost:${PORT} to access the dashboard`);
   console.log(`🤖 Bot is ready for tweet approval and monitoring!`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Memory usage: ${JSON.stringify(process.memoryUsage())}`);
   
   // Initialize multi-agent framework after server starts (with error handling)
   try {
