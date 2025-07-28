@@ -2627,4 +2627,17 @@ app.get('/api/debug/ffmpeg', (req, res) => {
       nodeVersion: process.version
     });
   }
+});
+
+// Debug endpoint to check deployment version
+app.get('/api/debug/version', (req, res) => {
+  res.json({
+    success: true,
+    version: 'v1.0.0',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    ffmpegSimple: process.env.RAILWAY_FFMPEG_SIMPLE,
+    workingDirectory: process.cwd(),
+    nodeVersion: process.version
+  });
 }); 
