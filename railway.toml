@@ -1,6 +1,5 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci --only=production"
 
 [deploy]
 startCommand = "npm start"
@@ -11,4 +10,5 @@ restartPolicyMaxRetries = 10
 
 [env]
 NODE_ENV = "production"
-NPM_CONFIG_PRODUCTION = "true" 
+NPM_CONFIG_PRODUCTION = "true"
+PUPPETEER_SKIP_DOWNLOAD = "true" 
