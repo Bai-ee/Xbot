@@ -235,42 +235,53 @@ class ArweaveAudioClient {
         // Use simpler FFmpeg command for Railway to avoid segmentation faults
         const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
         
-        // Ensure FFmpeg is properly configured for Railway
-        if (process.env.NODE_ENV === 'production') {
-          console.log('[ArweaveAudioClient] Railway environment - using static FFmpeg binary');
-          // Re-set the FFmpeg path to ensure it's properly configured
-          try {
-            const ffmpegPath = require('ffmpeg-static');
-            ffmpeg.setFfmpegPath(ffmpegPath);
-            console.log('[ArweaveAudioClient] Railway: FFmpeg path set to:', ffmpegPath);
-          } catch (error) {
-            console.error('[ArweaveAudioClient] Railway: Failed to set FFmpeg path:', error.message);
-          }
-        }
+                         // Ensure FFmpeg is properly configured for Railway
+                 if (process.env.NODE_ENV === 'production') {
+                   console.log('[ArweaveAudioClient] Railway environment - using static FFmpeg binary');
+                   // Re-set the FFmpeg path to ensure it's properly configured
+                   try {
+                     const ffmpegPath = require('ffmpeg-static');
+                     ffmpeg.setFfmpegPath(ffmpegPath);
+                     console.log('[ArweaveAudioClient] Railway: FFmpeg path set to:', ffmpegPath);
+                     
+                     // Add additional Railway-specific options to prevent crashes
+                     if (process.env.RAILWAY_FFMPEG_SIMPLE === 'true') {
+                       console.log('[ArweaveAudioClient] Railway: Using simplified FFmpeg options');
+                     }
+                   } catch (error) {
+                     console.error('[ArweaveAudioClient] Railway: Failed to set FFmpeg path:', error.message);
+                   }
+                 }
         
         return await new Promise((resolve, reject) => {
           let command;
           
-          if (useSimpleCommand) {
-            // Simple command for Railway - no complex filters
-            console.log('[ArweaveAudioClient] Using simple FFmpeg command for Railway compatibility');
-            command = ffmpeg(url)
-              .setStartTime(startTime)
-              .duration(duration)
-              .audioCodec('aac')
-              .output(outputPath);
-          } else {
-            // Full featured command for local development
-            command = ffmpeg(url)
-              .setStartTime(startTime)
-              .duration(duration)
-              .audioFilters([
-                `afade=t=in:st=0:d=${fadeInDuration}`,
-                `afade=t=out:st=${duration - fadeOutDuration}:d=${fadeOutDuration}`
-              ])
-              .audioCodec('aac')
-              .output(outputPath);
-          }
+                           if (useSimpleCommand) {
+                   // Simple command for Railway - no complex filters
+                   console.log('[ArweaveAudioClient] Using simple FFmpeg command for Railway compatibility');
+                   command = ffmpeg(url)
+                     .setStartTime(startTime)
+                     .duration(duration)
+                     .audioCodec('aac')
+                     .audioBitrate('128k')
+                     .audioChannels(2)
+                     .audioFrequency(44100)
+                     .output(outputPath);
+                 } else {
+                   // Full featured command for local development
+                   command = ffmpeg(url)
+                     .setStartTime(startTime)
+                     .duration(duration)
+                     .audioFilters([
+                       `afade=t=in:st=0:d=${fadeInDuration}`,
+                       `afade=t=out:st=${duration - fadeOutDuration}:d=${fadeOutDuration}`
+                     ])
+                     .audioCodec('aac')
+                     .audioBitrate('128k')
+                     .audioChannels(2)
+                     .audioFrequency(44100)
+                     .output(outputPath);
+                 }
 
           // Add metadata if provided
           if (metadata) {
