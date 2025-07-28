@@ -1911,24 +1911,46 @@ app.post('/api/video/custom', async (req, res) => {
 
 // Generate Arweave audio clip 
 app.post('/api/audio/generate', async (req, res) => {
+  console.log(`🎵 Audio generation API called`);
+  console.log(`📊 Request body:`, JSON.stringify(req.body));
+  console.log(`🔧 Environment: ${process.env.NODE_ENV}`);
+  console.log(`📍 Current directory: ${process.cwd()}`);
+  console.log(`🤖 Multi-agent orchestrator available: ${!!multiAgentOrchestrator}`);
+  
   try {
     const { artist, duration = 30, prompt } = req.body;
     
     console.log(`🎵 Audio generation requested: ${duration}s${artist ? ` for ${artist}` : ' (random)'}`);
+    console.log(`⚙️ Parameters: artist=${artist}, duration=${duration}, prompt=${prompt}`);
     
     const audioPrompt = prompt || `Generate ${duration}-second audio clip${artist ? ` for ${artist}` : ''}`;
+    console.log(`💬 Audio prompt: ${audioPrompt}`);
     
+    console.log('🔄 Calling multi-agent orchestrator...');
     const result = await multiAgentOrchestrator.processRequest(audioPrompt, {
       source: 'audio_api',
       priority: 'high',
       artist: artist,
       duration: duration
     });
+    console.log('✅ Multi-agent orchestrator completed');
+    console.log('📊 Result structure:', Object.keys(result));
+    console.log('📋 Results types:', Object.values(result.results).map(r => r.type));
 
     // Find audio generation result in the results array
     const audioResult = Object.values(result.results).find(r => r.type === 'audio_generation');
+    console.log('🎵 Audio result found:', !!audioResult);
     
     if (audioResult?.success) {
+      console.log('✅ Audio generation successful');
+      console.log('📁 File details:', {
+        filename: audioResult.fileName,
+        artist: audioResult.artist,
+        mixTitle: audioResult.mixTitle,
+        duration: audioResult.duration,
+        fileSize: audioResult.fileSize
+      });
+      
       res.json({
         success: true,
         audio: {
@@ -1946,11 +1968,19 @@ app.post('/api/audio/generate', async (req, res) => {
         metadata: audioResult.metadata
       });
     } else {
+      console.error('❌ Audio result not successful:', audioResult);
       throw new Error(audioResult?.error || 'Audio generation failed');
     }
 
   } catch (error) {
     console.error('❌ Audio generation error:', error);
+    console.error('🔍 Error stack:', error.stack);
+    console.error('📊 Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    
     res.status(500).json({
       success: false,
       error: 'Audio generation failed',

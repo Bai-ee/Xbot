@@ -223,19 +223,24 @@ class ArweaveAudioClient {
    * Enhanced with retry logic and better error handling
    */
   async downloadSegmentDirectly(url, startTime, duration, outputPath, fadeInDuration = 2, fadeOutDuration = 2, metadata = null) {
-    console.log(`[ArweaveAudioClient] Direct segment download: ${url.substring(0, 60)}..., Start: ${startTime}s, Duration: ${duration}s`);
+    console.log(`[ArweaveAudioClient] 📥 Direct segment download: ${url.substring(0, 60)}..., Start: ${startTime}s, Duration: ${duration}s`);
+    console.log(`[ArweaveAudioClient] 📁 Output path: ${outputPath}`);
+    console.log(`[ArweaveAudioClient] 🔧 Environment: ${process.env.NODE_ENV}`);
+    console.log(`[ArweaveAudioClient] 🐳 Railway FFmpeg simple: ${process.env.RAILWAY_FFMPEG_SIMPLE}`);
 
     const maxRetries = 3;
     let lastError;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[ArweaveAudioClient] Attempt ${attempt}/${maxRetries} for segment download`);
+        console.log(`[ArweaveAudioClient] 🔄 Attempt ${attempt}/${maxRetries} for segment download`);
         
         // Use simpler FFmpeg command for Railway to avoid segmentation faults
         const useSimpleCommand = process.env.NODE_ENV === 'production' || process.env.RAILWAY_FFMPEG_SIMPLE === 'true' || attempt > 1;
+        console.log(`[ArweaveAudioClient] ⚙️ Using simple command: ${useSimpleCommand}`);
         
-                         // FFmpeg is already configured via system installation in Docker
+        // FFmpeg is already configured via system installation in Docker
+        console.log(`[ArweaveAudioClient] 🔧 FFmpeg configuration: System FFmpeg in Docker`);
         
         return await new Promise((resolve, reject) => {
           let command;
@@ -463,8 +468,16 @@ class ArweaveAudioClient {
    * Enhanced with fallback mechanisms for better reliability
    */
   async generateAudioClip(duration = 30, fadeInDuration = 2, fadeOutDuration = 2, prompt = null, options = {}) {
+    console.log(`[ArweaveAudioClient] 🎵 Starting audio clip generation - ${duration}s clip`);
+    console.log(`[ArweaveAudioClient] 📍 Current working directory: ${process.cwd()}`);
+    console.log(`[ArweaveAudioClient] 🔧 Environment: ${process.env.NODE_ENV}`);
+    console.log(`[ArweaveAudioClient] 🐳 Docker environment: ${process.env.RAILWAY_FFMPEG_SIMPLE}`);
+    console.log(`[ArweaveAudioClient] 📊 Options:`, JSON.stringify(options));
+    console.log(`[ArweaveAudioClient] 💬 Prompt:`, prompt);
+    
     try {
       // Check if we have any artists data
+      console.log(`[ArweaveAudioClient] 📋 Artists data available: ${this.artistsData ? this.artistsData.length : 0} artists`);
       if (!this.artistsData || this.artistsData.length === 0) {
         throw new Error('No artists data available. Please ensure artists.json is properly configured.');
       }
@@ -473,10 +486,8 @@ class ArweaveAudioClient {
       const requestedDuration = prompt ? this.extractRequestedDuration(prompt) : duration;
       const requestedArtist = prompt ? this.extractArtistFromPrompt(prompt) : options.artist;
       
-      console.log(`[ArweaveAudioClient] Starting audio clip generation - ${requestedDuration}s clip`);
-      if (requestedArtist) {
-        console.log(`[ArweaveAudioClient] Artist requested: ${requestedArtist}`);
-      }
+      console.log(`[ArweaveAudioClient] 🎯 Requested duration: ${requestedDuration}s`);
+      console.log(`[ArweaveAudioClient] 🎤 Requested artist: ${requestedArtist || 'random'}`);
       
       // Try multiple artists/mixes if one fails
       const maxAttempts = 3;
