@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+buildCommand = "npm ci --only=production"
 
 [deploy]
 startCommand = "npm start"
@@ -9,4 +10,5 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
 [env]
-NODE_ENV = "production" 
+NODE_ENV = "production"
+NPM_CONFIG_PRODUCTION = "true" 
