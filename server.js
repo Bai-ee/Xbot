@@ -237,13 +237,13 @@ app.use('/outputs/images', express.static(path.join(__dirname, 'outputs', 'image
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Routes
+// Fallback route for root path if static file doesn't exist
 app.get('/', (req, res) => {
-  try {
-    // Try to serve the static file first
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  } catch (error) {
-    console.error('Error serving index.html:', error);
+  // Check if index.html exists
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
     // Fallback to a simple status page
     res.status(200).send(`
       <!DOCTYPE html>
@@ -263,6 +263,8 @@ app.get('/', (req, res) => {
     `);
   }
 });
+
+// Routes
 
 // Get pending tweets
 app.get('/api/tweets', (req, res) => {
